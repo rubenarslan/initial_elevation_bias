@@ -143,6 +143,27 @@ first_page <- first_page %>% ungroup() %>% mutate(
 ```
 
 ## Description
+
+### Demographics
+```{r}
+skimr::skim_with(haven_labelled = skimr::get_skimmers()$numeric)
+all_surveys <- all_surveys %>% filter(stringr::str_sub(session, 1, 7) %in% first_page$session) 
+
+all_surveys %>% 
+  select(age, hetero_relationship, education_years, has_children, nr_children) %>% skimr::skim_to_wide() %>% 
+  knitr::kable()
+
+sort(round(props(all_surveys$occupational_status),2))
+sort(round(props(all_surveys$occupational_status %contains% "student"),2))
+sort(round(props(all_surveys$occupational_status %contains% "employed"),2))
+
+codebook::plot_labelled(all_surveys$occupational_status) + coord_flip()
+sort(round(props(haven::as_factor(all_surveys$relationship_status)),2))
+codebook::plot_labelled(all_surveys$relationship_status) + coord_flip()
+```
+
+
+### Diary
 The following items were shown in random order on the first page of our diary. 
 
 - I was stressed. (40% probability of being shown)
