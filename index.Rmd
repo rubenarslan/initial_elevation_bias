@@ -2,6 +2,11 @@
 editor_options:
   chunk_output_type: inline
 title: "Routinely randomise question display and order to estimate and adjust for biases."
+author:
+  - name: "Ruben C. Arslan"
+    url: https://rubenarslan.github.io
+    affiliation_url: https://www.mpib-berlin.mpg.de/en/staff/ruben-arslan
+    affiliation: "Center for Adaptive Rationality, Max Planck Institute for Human Development, Berlin" 
 output:
   radix::radix_article: 
     toc: true
@@ -9,8 +14,6 @@ output:
     code_folding: 'hide'
     self_contained: false
 ---
-
-# Routinely randomise question display and order to estimate and adjust for biases
 
 Replicating and extending [Shrout et al. (2017)](http://www.pnas.org/content/early/2017/12/12/1712277115.full), amending
 their recommendations.
@@ -46,8 +49,8 @@ ended <- diary %>% mutate(finished_that_day = !is.na(ended_diary)) %>% select(se
 
 if (!file.exists("../routine_and_sex/data/s3_daily_id_proc.rds")) {
   s3_daily_id = jsonlite::fromJSON("../routine_and_sex/data/s3_daily_itemdisplay.json")
-  saveRDS(s3_daily_id, file = "../routine_and_sex/data/s3_daily_id.rds")
-  s3_daily_id = readRDS(file = "../routine_and_sex/data/s3_daily_id.rds")
+  # saveRDS(s3_daily_id, file = "../routine_and_sex/data/s3_daily_id.rds")
+  # s3_daily_id = readRDS(file = "../routine_and_sex/data/s3_daily_id.rds")
   s3_daily_id = s3_daily_id  %>% 
     filter(!is.na(session), !session %contains% "XXX") %>%
     mutate(
@@ -98,25 +101,26 @@ if (!file.exists("../routine_and_sex/data/s3_daily_id_proc.rds")) {
   s3_daily_id = readRDS(file = "../routine_and_sex/data/s3_daily_id_proc.rds")
 }
 
-  
-first_page = s3_daily_id  %>% 
-  filter(item_name %in% c("irritable", "self_esteem", "risk_taking", "good_mood", "loneliness", "stressed")) %>% 
-  mutate(answer = as.numeric(answer))
+questions <- rio::import("https://docs.google.com/spreadsheets/d/1Xo4fRvIzPYbWibVgJ9nm7vES39DSAWQBztnB8j7PdIo/edit#gid=232713254", format = "xlsx")
+# choices <- rio::import("https://docs.google.com/spreadsheets/d/1Xo4fRvIzPYbWibVgJ9nm7vES39DSAWQBztnB8j7PdIo/edit#gid=1837266155", which = 2)
+questions <- questions %>% 
+  filter(!is.na(label_en), label_en != "") %>% 
+  mutate_if(is.character, ~ if_na(., "")) %>% select(type:label_en)
 
-labels <- data.frame(item_name = c("irritable", "self_esteem", "risk_taking", "good_mood", "loneliness", "stressed"), label_english = c(
-  "I was irritable.",
-  "I was satisfied with myself.",
-  "I was prepared to take risks.",
-  "My mood was good.",
-  "I was lonely.",
-  "I was stressed."))
-first_page <- first_page %>% left_join(labels, by = 'item_name')
+# choices <- choices %>% 
+#   filter(!is.na(name), name != "") %>% 
+#   mutate(
+#     list_name = na_if(list_name, ""),
+#     list_name = zoo::na.locf(list_name)
+#     )
 
-first_page = first_page %>% filter(hidden == 0, !is.na(answer)) %>% 
-  group_by(session, unit_session_id) %>% 
-  mutate(display_order = min_rank(display_order))
+s3_daily_id <- s3_daily_id  %>% left_join(
+  questions %>% 
+    select(item_name = name, label_english = label_en, item_type = type)
+  )
 
-first_page = first_page %>% 
+s3_daily_id = s3_daily_id %>% 
+  filter(!is.na(answer)) %>% 
   group_by(session, unit_session_id) %>% 
   mutate(first_item_on_first_day = display_order == 1 & first_day,
          number_of_items_shown = n()) %>% 
@@ -124,22 +128,49 @@ first_page = first_page %>%
   group_by(session, unit_session_id) %>% 
   mutate(
     last_answer = lag(answer),
-    last_item = relevel(factor(recode(lag(item_name), .missing = "none")), ref =  "none"),
     response_time_since_previous = answered_relative - lag(answered_relative),
-         response_time_pl_sp = if_else(is.na(response_time_since_previous), if_else(
-           answered_relative == min(answered_relative, na.rm = TRUE), answered_relative - shown_relative, NA_real_), response_time_since_previous))
+    response_time_pl_sp = if_else(is.na(response_time_since_previous), 
+                                  if_else(
+                                    answered_relative == min(answered_relative, na.rm = TRUE), 
+                                    answered_relative - shown_relative, 
+                                    NA_real_), 
+                                  response_time_since_previous)) %>% 
+  ungroup()
 
-first_page = first_page %>% 
+s3_daily_id = s3_daily_id %>% 
   group_by(session, item_name) %>% 
   arrange(session, item_name, unit_session_id) %>% 
   mutate(times_item_answered = cumsum(!is.na(answer)))
 
-first_page <- first_page %>% ungroup() %>% mutate(
-  times_item_answered_factor = factor(if_else(times_item_answered > 6, "7+", as.character(times_item_answered))),
-  day_number_factor = factor(if_else(day_number > 6, "7+", as.character(day_number))),
-  refer_time_period = recode(factor(refer_time_period), "in den letzten 24 Stunden" = "last 24 hours", "seit meinem letzten Eintrag" = "last entry")
+s3_daily_id <- s3_daily_id %>% ungroup() %>% 
+  mutate(
+    times_item_answered_factor = factor(if_else(times_item_answered > 6, "7+", as.character(times_item_answered))),
+    day_number_factor = factor(if_else(day_number > 6, "7+", as.character(day_number))),
+    refer_time_period = recode(factor(refer_time_period), "in den letzten 24 Stunden" = "last 24 hours", "seit meinem letzten Eintrag" = "last entry")
 )
 
+s3_daily_id <- s3_daily_id %>% 
+  filter(item_type %starts_with% "rating") %>% 
+  mutate(answer = as.numeric(answer)) %>% 
+  group_by(label_english) %>% 
+  mutate(item_mean = mean(answer, na.rm = T),
+         item_sd = sd(answer, na.rm = T)) %>% 
+  ungroup()
+  
+
+first_page = s3_daily_id  %>% 
+  filter(item_name %in% c("irritable", "self_esteem", "risk_taking", "good_mood", "loneliness", "stressed"))
+
+first_page = first_page %>% 
+  filter(hidden == 0, !is.na(answer)) %>% 
+  group_by(session, unit_session_id) %>% 
+  mutate(display_order = min_rank(display_order),
+         number_of_items_shown = n()) %>%  
+  arrange(session, unit_session_id, display_order) %>% 
+  mutate(
+        last_item = if_na(lag(item_name), "none")) %>% 
+  ungroup() %>% 
+  mutate(last_item = relevel(factor(last_item), ref =  "none"))
 ```
 
 ## Description
@@ -149,7 +180,14 @@ first_page <- first_page %>% ungroup() %>% mutate(
 skimr::skim_with(haven_labelled = skimr::get_skimmers()$numeric)
 all_surveys <- all_surveys %>% filter(stringr::str_sub(session, 1, 7) %in% first_page$session) 
 
+first_page %>% group_by(session, unit_session_id) %>% 
+  summarise(answered = any(!is.na(answer))) %>% 
+  summarise(days = sum(answered)) %>% 
+  select(days) %>% 
+  skimr::skim_to_wide()
+
 all_surveys %>% 
+  haven::zap_labels() %>% 
   select(age, hetero_relationship, education_years, has_children, nr_children) %>% skimr::skim_to_wide() %>% 
   knitr::kable()
 
@@ -197,7 +235,7 @@ Because of the randomisation, selection should play no role. However, in longitu
 Since our between-subject SDs are all around 1 and these biases are likely to be relative to the Likert scale used, we don't do this.
 
 ```{r fig.height=10}
-theme_set(theme_classic() + theme_pander(base_size = 20))
+theme_set(theme_classic() + theme_pander(base_size = 18))
 first_page %>% mutate(days = n_distinct(created)) %>% group_by(label_english) %>% summarise(
   mean = mean(answer, na.rm = T),
   sd = sd(answer, na.rm = T),
@@ -219,10 +257,9 @@ first_page %>%
 ```
 
 ### Simple time series
-Just a quick check that fluctuation in whether a question is asked is as random as intended 
-over time.
+Just a quick check that fluctuation in whether a question is asked is as random as intended over time. The Y axes include the global mean ± 1 global standard deviation for each item.
 
-```{r}
+```{r layout='l-screen-inset',fig.width=21,fig.height=5}
 first_page %>% 
   group_by(day_number) %>% 
   mutate(n_days = n_distinct(session)) %>% 
@@ -232,37 +269,24 @@ ggplot(., aes(day_number, n)) +
   geom_line() +
   scale_y_continuous("Question asked") +
   scale_x_continuous("Day number") +
-  facet_wrap(~ label_english, nrow = 1, scales = 'free_y') +
+  facet_wrap(~ label_english, nrow = 1) +
   ggtitle("Percentage question asked over time")
 ```
 
 
 ```{r layout='l-screen-inset',fig.width=21,fig.height=5}
-first_page %>% group_by(label_english) %>% 
-  mutate(mean = mean(answer, na.rm = T)) %>% 
-ggplot(., aes(day_number, answer)) + 
-  geom_hline(aes(yintercept = mean), linetype = 'dashed') + 
+first_page %>% 
+  ggplot(., aes(day_number, answer)) + 
+  geom_blank(aes(y = item_mean, ymin = item_mean - item_sd, ymax = item_mean + item_sd)) +
+  geom_hline(aes(yintercept = item_mean), linetype = 'dashed') + 
   geom_pointrange(position = position_dodge(width = 0.2), stat='summary', fun.data = 'mean_se') + 
   geom_line(position = position_dodge(width = 0.2), stat='summary', fun.data = 'mean_se') +
-  scale_y_continuous("Response", limits = c(0,4)) +
-  facet_wrap(~ label_english, nrow = 1) +
+  scale_y_continuous("Response") +
+  facet_wrap(~ label_english, nrow = 1, scales = "free_y") +
   scale_x_continuous("Day number") +
   ggtitle("Responses over time")
 ```
 
-Let's zoom in on the range of the means for each variable.
-
-```{r}
-first_page %>% group_by(label_english) %>% 
-  mutate(mean = mean(answer, na.rm = T)) %>% 
-ggplot(., aes(day_number, answer)) +   geom_pointrange(position = position_dodge(width = 0.2), stat='summary', fun.data = 'mean_se') + 
-  geom_hline(aes(yintercept = mean), linetype = 'dashed') + 
-  geom_line(position = position_dodge(width = 0.2), stat='summary', fun.data = 'mean_se') +
-  scale_y_continuous("Response") +
-  scale_x_continuous("Day number") +
-  facet_wrap(~ label_english, scales = "free_y", nrow = 2) + 
-  ggtitle("Responses over time", subtitle = "free y axes")
-```
 
 We showed above that responses do not drift much over time in the diary. But do
 participants learn to respond more quickly?
@@ -285,7 +309,7 @@ fewer lines are shown for items with a higher probability of being shown.
 Wherever the initial point of each line exceeds the mean of the other lines on the day,
 this would be evidence for initial elevation bias.
 
-In this graph, we show the first week.
+In this graph, we show the first week. The Y axes include the global mean ± 1 global standard deviation for each item.
 
 ```{r layout='l-screen-inset',fig.width=21,fig.height=5}
 first_page %>% 
@@ -295,6 +319,7 @@ first_page %>%
   group_by(item_name, day_number, first_day_of_item_factor) %>% 
   filter(n_nonmissing(answer) > 20) %>% 
   ggplot(., aes(day_number, answer, colour = first_day_of_item_factor)) + 
+  geom_blank(aes(y = item_mean, ymin = item_mean - item_sd, ymax = item_mean + item_sd)) +
   geom_hline(aes(yintercept = group_mean, group = label), color = "gray", linetype = 'dashed') +
   geom_pointrange(position = position_dodge(width = 0.2), stat = 'summary', fun.data = 'mean_se') + 
   geom_line(position = position_dodge(width = 0.4), stat = 'summary', fun.data = 'mean_se') + 
@@ -310,6 +335,7 @@ ggsave(first_page %>%
   group_by(item_name, day_number, first_day_of_item_factor) %>% 
   filter(n_nonmissing(answer) > 20) %>% 
   ggplot(., aes(day_number, answer, colour = first_day_of_item_factor)) + 
+  geom_blank(aes(y = item_mean, ymin = item_mean - item_sd, ymax = item_mean + item_sd)) +
   geom_hline(aes(yintercept = group_mean, group = label), color = "gray", linetype = 'dashed') +
   geom_pointrange(position = position_dodge(width = 0.2), stat = 'summary', fun.data = 'mean_se') + 
   geom_line(position = position_dodge(width = 0.4), stat = 'summary', fun.data = 'mean_se') + 
@@ -329,6 +355,7 @@ first_page %>%
   # group_by(item_name, day_number, first_day_of_item_factor) %>%
   # filter(n_nonmissing(answer) > 20) %>%
   ggplot(., aes(day_number, answer, colour = first_day_of_item_factor)) + 
+  geom_blank(aes(y = item_mean, ymin = item_mean - item_sd, ymax = item_mean + item_sd)) +
   geom_hline(aes(yintercept = group_mean, group = label), color = "gray", linetype = 'dashed') +
   geom_pointrange(position = position_dodge(width = 0.2), stat = 'summary', fun.data = 'mean_se') + 
   geom_line(position = position_dodge(width = 0.4), stat = 'summary', fun.data = 'mean_se') + 
@@ -356,6 +383,7 @@ first_page %>%
   group_by(item_name, day) %>% 
   filter(n_nonmissing(answer) > 20) %>% 
   ggplot(., aes(day, answer)) + 
+  geom_blank(aes(y = item_mean, ymin = item_mean - item_sd, ymax = item_mean + item_sd)) +
   geom_hline(aes(yintercept = group_mean, group = label), color = "gray", linetype = 'dashed') +
   geom_pointrange(position = position_dodge(width = 0.2), stat = 'summary', fun.data = 'mean_se') + 
   scale_y_continuous("Response") +
@@ -447,6 +475,7 @@ first_page %>%
   group_by(item_name, day_number, first_day_of_item_factor) %>% 
   filter(n_nonmissing(answer) > 20) %>% 
   ggplot(., aes(day_number, answer, colour = first_day_of_item_factor)) + 
+  geom_blank(aes(y = item_mean, ymin = item_mean - item_sd, ymax = item_mean + item_sd)) +
   geom_hline(aes(yintercept = group_mean, group = label), color = "gray", linetype = 'dashed') +
   geom_pointrange(position = position_dodge(width = 0.2), stat = 'summary', fun.data = 'mean_se') + 
   geom_line(position = position_dodge(width = 0.4), stat = 'summary', fun.data = 'mean_se') + 
@@ -475,18 +504,15 @@ first_page %>%
 The item order on each page was randomised too. If the mechanism for initial 
 elevation bias involves familiarity with the response scale, we might expect
 to find that the first item on the first page on the first day is answered differently
-than later responses. Different mechanisms of response bias (e.g., amount of mouse movement
-required to reply is equal for all responses for the first item, but reduced for unchanged
-responses to lower down items) could lead to different response biases according to item
-order.
+than later responses. Different mechanisms of response bias (e.g., amount of mouse movement required to reply is equal for all responses for the first item, but reduced for unchanged responses to lower down items) could lead to different response biases according to item order.
 
 Item order is confounded with another randomised variable, namely the number
-of items shown on each page. For example, an item order of six only occurs when all six items
-were shown.
+of items shown on each page. For example, an item order of six only occurs when all six items were shown.
 
 ```{r}
 first_page %>%
   ggplot(., aes(display_order, answer)) + 
+  geom_blank(aes(y = item_mean, ymin = item_mean - item_sd, ymax = item_mean + item_sd)) +
   geom_pointrange(position = position_dodge(width = 0.2), stat = 'summary', fun.data = 'mean_se') + 
   geom_line(position = position_dodge(width = 0.4), stat = 'summary', fun.data = 'mean_se') + 
   scale_y_continuous("Response") +
@@ -536,6 +562,7 @@ is also one.
 ```{r}
 first_page %>% 
   ggplot(., aes(number_of_items_shown, answer)) + 
+  geom_blank(aes(y = item_mean, ymin = item_mean - item_sd, ymax = item_mean + item_sd)) +
   geom_pointrange(position = position_dodge(width = 0.2), stat ='summary', fun.data = 'mean_se') + 
   # geom_line(position = position_dodge(width = 0.4), stat ='summary', fun.data = 'median_hilow') + 
   scale_y_continuous("Response") +
@@ -584,6 +611,7 @@ order effects. Some differences are apparent, though minute,
 first_page %>% 
   mutate(last_item = relevel(factor(last_item), "none")) %>% 
   ggplot(., aes(last_item, answer)) +
+  geom_blank(aes(y = item_mean, ymin = item_mean - item_sd, ymax = item_mean + item_sd)) +
   geom_pointrange(position = position_dodge(width = 0.2), stat ='summary', fun.data = 'mean_se') + 
   # geom_line(position = position_dodge(width = 0.4), stat ='summary', fun.data = 'median_hilow') + 
   scale_y_continuous("Response") +
@@ -595,7 +623,7 @@ ggsave(width = 15, height = 8, filename = "Figure3.png")
 ```
 
 It is not possible to infer whether the item content would bias the next response
-(i.e., a reminder of stress lowers mood) or whether these are the function
+(i.e., a reminder of stress truly lowers mood) or whether these are the function
 of participants minimising "mousework" (i.e., after responding 4 to one item,
 it is slightly less effort to answer 4 for the next item too than to choose
 a different response, and certain items elicit higher mean responses).
@@ -624,6 +652,7 @@ first_page %>%
   group_by(session, unit_session_id) %>% 
   filter(sd(answer, na.rm = TRUE) > 0) %>% 
   ggplot(., aes(last_item, answer)) + 
+  geom_blank(aes(y = item_mean, ymin = item_mean - item_sd, ymax = item_mean + item_sd)) +
   geom_pointrange(position = position_dodge(width = 0.2), stat ='summary', fun.data = 'mean_se') + 
   # geom_line(position = position_dodge(width = 0.4), stat ='summary', fun.data = 'median_hilow') + 
   scale_y_continuous("Response") +
@@ -656,9 +685,7 @@ We have investigated each randomised variable in turn, but we also noted that
 item order and number of items shown are confounded with one another. In addition,
 the first day an item is shown is likely to be an earlier day of the diary, where we might
 expect to see selection bias. Further, we varied the instructions in the diary depending
-on how long ago the last diary was answered. We instructed participants to refer to the time
-period since their last diary entry, if that had happened within the last 24 hours, or to the
-last 24 hours, if the last diary entry was longer ago (and if it was their first diary entry).
+on how long ago the last diary was answered. We instructed participants to refer to the time period since their last diary entry, if that had happened within the last 24 hours, or to the last 24 hours, if the last diary entry was longer ago (and if it was their first diary entry).
 
 In addition, a more generalised understanding of the initial elevation bias might 
 lead us to believe that responses are continuously elevated more, 
@@ -670,6 +697,7 @@ regression. We fit multilevel regression per item in lme4.
 
 ```{r}
 library(lme4)
+library(lmerTest)
 library(purrr)
 library(DT)
 show_dt <- . %>% 
@@ -723,6 +751,7 @@ predictors <- first_page %>%
          dnr = day_number,
          day_number = day_number_factor
          )
+
 complex_mods <-  predictors %>% 
   split(.$item_name) %>%
   map(~ lmer(answer ~ items_shown + item_order + times_item_shown + day_number + refer_time_period +  (1 | session), data = .))
@@ -743,17 +772,15 @@ all_biases %>%
   coord_flip()
 ```
 
-Is there evidence for an additional bias of the last item identity? We test this separately because
-item order 1 and last item "none" are identical, and estimates become less precise because
-of similar, less severe multicollinearity.
+Is there evidence for an additional bias of the last item identity? We test this separately because item order 1 and last item "none" are identical, and estimates become less precise because of similar, less severe multicollinearity.
 
 ```{r}
 predictors %>% 
   split(.$item_name) %>%
   map(~ as.data.frame(anova(
-    lmer(answer ~ items_shown + last_item + times_item_shown + day_number + refer_time_period +  (1 | session), data = ., REML = FALSE),
-    lmer(answer ~ items_shown + last_item + item_order + times_item_shown + day_number + refer_time_period +  (1 | session), data = ., REML = FALSE)
-    ))) %>% 
+    lmer(answer ~ items_shown + item_order + times_item_shown + day_number + refer_time_period +  (1 | session), data = ., REML = FALSE),
+    lmer(answer ~ last_item + items_shown + item_order + times_item_shown + day_number + refer_time_period +  (1 | session), data = .), REML = FALSE)
+    )) %>% 
   bind_rows(.id = "response") 
 ```
 
@@ -858,3 +885,222 @@ initial_elevation_bias_rt %>%
   show_dt()
 ```
 
+
+## Other items
+
+We focused on the most general items on the first page of our study.
+However, the diary also contained randomised (in order and odds of appearing) items about sexual desire, time use, and partner jealousy, among others. We show that
+the overall results (that residualising for estimated biases has negligible effects) holds here too, even though the partner jealousy items were asked on a response scale from "not at all" to "very much", the desire items on a scale of "very inaccurate" to "very accurate", and the time use items on the same "less than usual" to "more than usual" scale as the items on the first page.
+
+### Time items
+
+On  a "less than usual" to "more than usual" response scale.
+
+```{r}
+time_items = s3_daily_id  %>% 
+  filter(item_name %starts_with% "time_") %>% 
+  filter(hidden == 0, !is.na(answer)) %>% 
+  group_by(session, unit_session_id) %>% 
+  mutate(display_order = min_rank(display_order),
+         number_of_items_shown = n()) %>%  
+  arrange(session, unit_session_id, display_order) %>% 
+  mutate(
+        last_item = if_na(lag(item_name), "none")) %>% 
+  ungroup() %>% 
+  mutate(last_item = relevel(factor(last_item), ref =  "none"))
+
+```
+
+```{r fig.width=10,fig.height=8}
+predictors <- time_items %>% 
+  mutate(item_order = factor(display_order),
+         times_item_shown = times_item_answered_factor,
+         items_shown = factor(number_of_items_shown),
+         last_item = relevel(factor(last_item), "none"),
+         dnr = day_number,
+         day_number = day_number_factor
+         )
+
+complex_mods <-  predictors %>% 
+  split(.$item_name) %>%
+  map(~ lmer(answer ~ items_shown + item_order + times_item_shown + day_number + refer_time_period +  (1 | session), data = .))
+
+
+all_biases <- complex_mods %>% 
+  map(~ tidy(., conf.int = TRUE, conf.level = 0.99)) %>% 
+  bind_rows(.id = "response") 
+
+
+all_biases %>% 
+  filter(term != "refer_time_periodlast entry", 
+         str_sub(term, 1, 10) != "day_number", term != "(Intercept)", !is.na(conf.high)) %>% 
+  ggplot(aes(x = term, y = estimate, ymin = conf.low, ymax = conf.high)) +
+  geom_hline(yintercept = 0, linetype = 'dashed') +
+  facet_wrap(~ response) +
+  geom_pointrange() +
+  coord_flip()
+```
+
+How much do our variables change when we residualise for all of these biases?
+
+```{R}
+predictors %>% 
+  split(.$item_name) %>%
+  map(~ cor(.$answer, residuals(lm(answer ~ items_shown + last_item + times_item_shown + day_number + refer_time_period, data = .)))) %>% 
+  bind_rows() 
+```
+
+### Desire items
+
+On a "very inaccurate" to "very accurate" response scale.
+
+```{r}
+desire_items = s3_daily_id  %>% 
+  filter(item_name %contains% "pair") %>% 
+  filter(hidden == 0, !is.na(answer)) %>% 
+  group_by(session, unit_session_id) %>% 
+  mutate(display_order = min_rank(display_order),
+         number_of_items_shown = n()) %>%  
+  arrange(session, unit_session_id, display_order) %>% 
+  mutate(
+        last_item = if_na(lag(item_name), "none")) %>% 
+  ungroup() %>% 
+  mutate(last_item = relevel(factor(last_item), ref =  "none"))
+
+```
+
+```{r}
+desire_items %>% 
+  filter(item_name %contains% "in_pair") %>% 
+  filter(day_number < 7) %>% 
+  group_by(item_name) %>% 
+  mutate(group_mean = mean(answer, na.rm = TRUE)) %>% 
+  group_by(item_name, day_number, first_day_of_item_factor) %>% 
+  filter(n_nonmissing(answer) > 20) %>% 
+  ggplot(., aes(day_number, answer, colour = first_day_of_item_factor)) + 
+  geom_blank(aes(y = item_mean, ymin = item_mean - item_sd, ymax = item_mean + item_sd)) +
+  geom_hline(aes(yintercept = group_mean, group = label), color = "gray", linetype = 'dashed') +
+  geom_pointrange(position = position_dodge(width = 0.2), stat = 'summary', fun.data = 'mean_se') + 
+  geom_line(position = position_dodge(width = 0.4), stat = 'summary', fun.data = 'mean_se') + 
+  scale_color_colorblind("First day the\nitem was shown") +
+  scale_y_continuous("Response") +
+  facet_wrap(~ label_english, scales = "free_y", nrow = 3) + 
+  scale_x_continuous("Day number", breaks = 0:10)
+```
+
+
+```{r fig.width=10,fig.height=8}
+predictors <- desire_items %>% 
+  mutate(item_order = factor(display_order),
+         times_item_shown = times_item_answered_factor,
+         items_shown = factor(number_of_items_shown),
+         last_item = relevel(factor(last_item), "none"),
+         dnr = day_number,
+         day_number = day_number_factor
+         )
+
+complex_mods <-  predictors %>% 
+  split(.$item_name) %>%
+  map(~ lmer(answer ~ items_shown + item_order + times_item_shown + day_number + refer_time_period +  (1 | session), data = .))
+
+
+all_biases <- complex_mods %>% 
+  map(~ tidy(., conf.int = TRUE, conf.level = 0.99)) %>% 
+  bind_rows(.id = "response") 
+
+
+all_biases %>% 
+  filter(term != "refer_time_periodlast entry", 
+         str_sub(term, 1, 10) != "day_number", term != "(Intercept)", !is.na(conf.high)) %>% 
+  ggplot(aes(x = term, y = estimate, ymin = conf.low, ymax = conf.high)) +
+  geom_hline(yintercept = 0, linetype = 'dashed') +
+  facet_wrap(~ response) +
+  geom_pointrange() +
+  coord_flip()
+```
+
+Is there evidence for an additional bias of the last item identity? We test this separately because item order 1 and last item "none" are identical, and estimates become less precise because of similar, less severe multicollinearity.
+
+```{r}
+predictors %>% 
+  split(.$item_name) %>%
+  map(~ as.data.frame(anova(
+    lmer(answer ~ items_shown + last_item + times_item_shown + day_number + refer_time_period +  (1 | session), data = ., REML = FALSE),
+    lmer(answer ~ items_shown + last_item + item_order + times_item_shown + day_number + refer_time_period +  (1 | session), data = ., REML = FALSE)
+    ))) %>% 
+  bind_rows(.id = "response") 
+```
+
+
+How much do our variables change when we residualise for all of these biases?
+
+```{R}
+predictors %>% 
+  split(.$item_name) %>%
+  map(~ cor(.$answer, residuals(lm(answer ~ items_shown + last_item + times_item_shown + day_number + refer_time_period, data = .)))) %>% 
+  bind_rows() %>% 
+  gather(item, cor) %>% 
+  arrange(cor)
+```
+
+### Retention items
+
+On a "not at all" to "very much" response scale.
+
+```{r}
+retention_items = s3_daily_id  %>% 
+  filter(item_name %contains% "mate_retention") %>% 
+  filter(hidden == 0, !is.na(answer)) %>% 
+  group_by(session, unit_session_id) %>% 
+  mutate(display_order = min_rank(display_order),
+         number_of_items_shown = n()) %>%  
+  arrange(session, unit_session_id, display_order) %>% 
+  mutate(
+        last_item = if_na(lag(item_name), "none")) %>% 
+  ungroup() %>% 
+  mutate(last_item = relevel(factor(last_item), ref =  "none"))
+```
+
+
+
+```{r fig.width=10,fig.height=8}
+predictors <- retention_items %>% 
+  mutate(
+    item_order = factor(display_order),
+    times_item_shown = times_item_answered_factor,
+    items_shown = factor(number_of_items_shown),
+    last_item = relevel(factor(last_item), "none"),
+    dnr = day_number,
+    day_number = day_number_factor
+  )
+
+complex_mods <-  predictors %>% 
+  split(.$item_name) %>%
+  map(~ lmer(answer ~ items_shown + item_order + times_item_shown + day_number + refer_time_period +  (1 | session), data = .))
+
+
+all_biases <- complex_mods %>% 
+  map(~ tidy(., conf.int = TRUE, conf.level = 0.99)) %>% 
+  bind_rows(.id = "response")
+
+
+all_biases %>% 
+  filter(term != "refer_time_periodlast entry", 
+         str_sub(term, 1, 10) != "day_number", term != "(Intercept)", !is.na(conf.high)) %>% 
+  ggplot(aes(x = term, y = estimate, ymin = conf.low, ymax = conf.high)) +
+  geom_hline(yintercept = 0, linetype = 'dashed') +
+  facet_wrap(~ response) +
+  geom_pointrange() +
+  coord_flip()
+```
+
+How much do our variables change when we residualise for all of these biases?
+
+```{R}
+predictors %>% 
+  split(.$item_name) %>%
+  map(~ cor(.$answer, residuals(lm(answer ~ items_shown + last_item + times_item_shown + day_number + refer_time_period, data = .)))) %>% 
+  bind_rows() %>% 
+  gather(item, cor) %>% 
+  arrange(cor)
+```
