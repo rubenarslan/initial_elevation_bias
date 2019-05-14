@@ -75,11 +75,15 @@ if (!file.exists("../routine_and_sex/data/s3_daily_id_proc.rds")) {
     mutate(day_number = min(day_number, na.rm = TRUE)) %>%
     group_by(session, item_name) %>%
     mutate(
-           first_day_of_item = min(day_number[!is.na(answer)]),
-           first_day_of_item_factor = factor(if_else(first_day_of_item > 6, "7+", as.character(first_day_of_item))),
+           first_day_of_item = min(c(Inf, day_number[!is.na(answer)])),
+           first_day_of_item = if_else(is.finite(first_day_of_item),
+                                       first_day_of_item,
+                                       NA_real_),
+           first_day_of_item_factor = if_else(first_day_of_item > 6, "7+", as.character(first_day_of_item)),
            first_day_of_item_shown = first_day_of_item == day_number) %>%
    filter(day_number >= 0, day_number < 70, is.finite(day_number)) %>% 
     ungroup() %>% 
+    mutate(first_day_of_item_factor = factor(first_day_of_item_factor)) %>% 
     anti_join(dishonest, by = c("session", "day_number")) %>% 
     semi_join(ended, by = c("session", "day_number")) %>% 
     mutate(session = as.factor(stringr::str_sub(session, 1, 7)))
@@ -90,11 +94,16 @@ if (!file.exists("../routine_and_sex/data/s3_daily_id_proc.rds")) {
                             if_else(hidden == 0, 0,
                             1, 1)))
     
-  s3_daily_id <- s3_daily_id %>% left_join(diary_items %>% rename(item_name = name) %>% select(item_name, label, choices), "item_name")
+  s3_daily_id <- s3_daily_id %>% 
+    left_join(
+      diary_items %>% 
+        rename(item_name = name) %>% 
+        select(item_name, label, choices), 
+      "item_name")
   
   s3_daily_id = s3_daily_id %>% 
-  group_by(session, unit_session_id) %>% 
-  mutate(refer_time_period = answer[item_name == "refer_time_period"][1])
+    group_by(session, unit_session_id) %>% 
+    mutate(refer_time_period = answer[item_name == "refer_time_period"][1])
 
   saveRDS(s3_daily_id, file = "../routine_and_sex/data/s3_daily_id_proc.rds")
 } else {
@@ -149,6 +158,9 @@ s3_daily_id <- s3_daily_id %>% ungroup() %>%
     refer_time_period = recode(factor(refer_time_period), "in den letzten 24 Stunden" = "last 24 hours", "seit meinem letzten Eintrag" = "last entry")
 )
 
+s3_daily_id$label <- s3_daily_id$label_english
+
+
 s3_daily_id <- s3_daily_id %>% 
   filter(item_type %starts_with% "rating") %>% 
   mutate(answer = as.numeric(answer)) %>% 
@@ -184,20 +196,23 @@ first_page %>% group_by(session, unit_session_id) %>%
   summarise(answered = any(!is.na(answer))) %>% 
   summarise(days = sum(answered)) %>% 
   select(days) %>% 
-  skimr::skim_to_wide()
+  skimr::skim_to_wide() %>% 
+  knitr::kable()
 
 all_surveys %>% 
   haven::zap_labels() %>% 
   select(age, hetero_relationship, education_years, has_children, nr_children) %>% skimr::skim_to_wide() %>% 
   knitr::kable()
 
-sort(round(props(all_surveys$occupational_status),2))
-sort(round(props(all_surveys$occupational_status %contains% "student"),2))
-sort(round(props(all_surveys$occupational_status %contains% "employed"),2))
+occupational_status <- all_surveys$occupational_status
+sort(round(props(occupational_status),2)) %>% 
+  knitr::kable()
+sort(round(props(occupational_status %contains% "student"),2))
+sort(round(props(occupational_status %contains% "employed"),2))
 
-codebook::plot_labelled(all_surveys$occupational_status) + coord_flip()
-sort(round(props(haven::as_factor(all_surveys$relationship_status)),2))
-codebook::plot_labelled(all_surveys$relationship_status) + coord_flip()
+relationship_status <- all_surveys$relationship_status
+sort(round(props(haven::as_factor(relationship_status)),2))
+codebook::plot_labelled(relationship_status) + coord_flip()
 ```
 
 
@@ -645,7 +660,8 @@ first_page %>%
                                    0.23^number_of_items_shown +
                                    0.21^number_of_items_shown +
                                    0.12^number_of_items_shown +
-                                   0.07^number_of_items_shown)
+                                   0.07^number_of_items_shown) %>% 
+  knitr::kable()
   
 first_page %>% 
   mutate(last_item = relevel(factor(last_item), "none")) %>% 
@@ -781,7 +797,8 @@ predictors %>%
     lmer(answer ~ items_shown + item_order + times_item_shown + day_number + refer_time_period +  (1 | session), data = ., REML = FALSE),
     lmer(answer ~ last_item + items_shown + item_order + times_item_shown + day_number + refer_time_period +  (1 | session), data = .), REML = FALSE)
     )) %>% 
-  bind_rows(.id = "response") 
+  bind_rows(.id = "response") %>% 
+  knitr::kable()
 ```
 
 
@@ -791,7 +808,10 @@ How much do our variables change when we residualise for all of these biases?
 predictors %>% 
   split(.$item_name) %>%
   map(~ cor(.$answer, residuals(lm(answer ~ items_shown + last_item + times_item_shown + day_number + refer_time_period, data = .)))) %>% 
-  bind_rows() 
+  bind_rows() %>% 
+  gather(variable, cor) %>% 
+  arrange(cor) %>% 
+  knitr::kable()
 ```
 
 Not much at all.
@@ -835,7 +855,10 @@ How much do our variables change when we residualise for all of these biases?
 predictors %>% 
   split(.$item_name) %>%
   map(~ cor(.$answer, residuals(lm(answer ~ items_shown + last_item + times_item_shown + day_number + refer_time_period, data = .)))) %>% 
-  bind_rows() 
+  bind_rows() %>% 
+  gather(variable, cor) %>% 
+  arrange(cor) %>% 
+  knitr::kable()
 ```
 
 #### Regression table
@@ -894,6 +917,7 @@ the overall results (that residualising for estimated biases has negligible effe
 
 ### Time items
 
+
 On  a "less than usual" to "more than usual" response scale.
 
 ```{r}
@@ -908,18 +932,44 @@ time_items = s3_daily_id  %>%
         last_item = if_na(lag(item_name), "none")) %>% 
   ungroup() %>% 
   mutate(last_item = relevel(factor(last_item), ref =  "none"))
-
 ```
+
+```{r}
+time_items %>% group_by(item_name, label_english, choices) %>% 
+  summarise(women = n_distinct(session),
+            days = n_distinct(unit_session_id)) %>% 
+  knitr::kable()
+```
+
+```{r}
+time_items %>% 
+  filter(day_number < 7) %>% 
+  group_by(item_name) %>% 
+  mutate(group_mean = mean(answer, na.rm = TRUE)) %>% 
+  group_by(item_name, day_number, first_day_of_item_factor) %>% 
+  filter(n_nonmissing(answer) > 20) %>% 
+  ggplot(., aes(day_number, answer, colour = first_day_of_item_factor)) + 
+  geom_blank(aes(y = item_mean, ymin = item_mean - item_sd, ymax = item_mean + item_sd)) +
+  geom_hline(aes(yintercept = group_mean, group = label), color = "gray", linetype = 'dashed') +
+  geom_pointrange(position = position_dodge(width = 0.2), stat = 'summary', fun.data = 'mean_se') + 
+  geom_line(position = position_dodge(width = 0.4), stat = 'summary', fun.data = 'mean_se') + 
+  scale_color_colorblind("First day the\nitem was shown") +
+  scale_y_continuous("Response") +
+  facet_wrap(~ label_english, scales = "free_y", nrow = 3) + 
+  scale_x_continuous("Day number", breaks = 0:10)
+```
+
 
 ```{r fig.width=10,fig.height=8}
 predictors <- time_items %>% 
-  mutate(item_order = factor(display_order),
-         times_item_shown = times_item_answered_factor,
-         items_shown = factor(number_of_items_shown),
-         last_item = relevel(factor(last_item), "none"),
-         dnr = day_number,
-         day_number = day_number_factor
-         )
+  mutate(
+    item_order = factor(display_order),
+     times_item_shown = times_item_answered_factor,
+     items_shown = factor(number_of_items_shown),
+     last_item = relevel(factor(last_item), "none"),
+     dnr = day_number,
+     day_number = day_number_factor
+     )
 
 complex_mods <-  predictors %>% 
   split(.$item_name) %>%
@@ -937,7 +987,8 @@ all_biases %>%
   ggplot(aes(x = term, y = estimate, ymin = conf.low, ymax = conf.high)) +
   geom_hline(yintercept = 0, linetype = 'dashed') +
   facet_wrap(~ response) +
-  geom_pointrange() +
+  geom_linerange() +
+  scale_y_continuous("95% CIs for regression coefficients") +
   coord_flip()
 ```
 
@@ -947,7 +998,10 @@ How much do our variables change when we residualise for all of these biases?
 predictors %>% 
   split(.$item_name) %>%
   map(~ cor(.$answer, residuals(lm(answer ~ items_shown + last_item + times_item_shown + day_number + refer_time_period, data = .)))) %>% 
-  bind_rows() 
+  bind_rows() %>% 
+  gather(variable, cor) %>% 
+  arrange(cor) %>% 
+  knitr::kable()
 ```
 
 ### Desire items
@@ -955,8 +1009,11 @@ predictors %>%
 On a "very inaccurate" to "very accurate" response scale.
 
 ```{r}
+ip_desire_items <- c("in_pair_desire_7", "in_pair_desire_8",
+                     "in_pair_desire_10", "in_pair_desire_11",
+                     "in_pair_desire_13", "in_pair_desire_14")
 desire_items = s3_daily_id  %>% 
-  filter(item_name %contains% "pair") %>% 
+  filter(item_name %in% ip_desire_items) %>% 
   filter(hidden == 0, !is.na(answer)) %>% 
   group_by(session, unit_session_id) %>% 
   mutate(display_order = min_rank(display_order),
@@ -966,12 +1023,18 @@ desire_items = s3_daily_id  %>%
         last_item = if_na(lag(item_name), "none")) %>% 
   ungroup() %>% 
   mutate(last_item = relevel(factor(last_item), ref =  "none"))
-
 ```
 
 ```{r}
+desire_items %>% group_by(item_name, label_english, choices) %>% 
+  summarise(women = n_distinct(session),
+            days = n_distinct(unit_session_id)) %>% 
+  knitr::kable()
+```
+
+
+```{r}
 desire_items %>% 
-  filter(item_name %contains% "in_pair") %>% 
   filter(day_number < 7) %>% 
   group_by(item_name) %>% 
   mutate(group_mean = mean(answer, na.rm = TRUE)) %>% 
@@ -1015,22 +1078,10 @@ all_biases %>%
   ggplot(aes(x = term, y = estimate, ymin = conf.low, ymax = conf.high)) +
   geom_hline(yintercept = 0, linetype = 'dashed') +
   facet_wrap(~ response) +
-  geom_pointrange() +
+  geom_linerange() +
+  scale_y_continuous("95% CIs for regression coefficients") +
   coord_flip()
 ```
-
-Is there evidence for an additional bias of the last item identity? We test this separately because item order 1 and last item "none" are identical, and estimates become less precise because of similar, less severe multicollinearity.
-
-```{r}
-predictors %>% 
-  split(.$item_name) %>%
-  map(~ as.data.frame(anova(
-    lmer(answer ~ items_shown + last_item + times_item_shown + day_number + refer_time_period +  (1 | session), data = ., REML = FALSE),
-    lmer(answer ~ items_shown + last_item + item_order + times_item_shown + day_number + refer_time_period +  (1 | session), data = ., REML = FALSE)
-    ))) %>% 
-  bind_rows(.id = "response") 
-```
-
 
 How much do our variables change when we residualise for all of these biases?
 
@@ -1040,7 +1091,8 @@ predictors %>%
   map(~ cor(.$answer, residuals(lm(answer ~ items_shown + last_item + times_item_shown + day_number + refer_time_period, data = .)))) %>% 
   bind_rows() %>% 
   gather(item, cor) %>% 
-  arrange(cor)
+  arrange(cor) %>% 
+  knitr::kable()
 ```
 
 ### Retention items
@@ -1061,7 +1113,34 @@ retention_items = s3_daily_id  %>%
   mutate(last_item = relevel(factor(last_item), ref =  "none"))
 ```
 
+```{r}
+retention_items %>% 
+  group_by(item_name, label_english, choices) %>% 
+  summarise(women = n_distinct(session),
+            days = n_distinct(unit_session_id)) %>% 
+  knitr::kable()
+```
 
+
+
+
+```{r}
+retention_items %>% 
+  filter(day_number < 7) %>% 
+  group_by(item_name) %>% 
+  mutate(group_mean = mean(answer, na.rm = TRUE)) %>% 
+  group_by(item_name, day_number, first_day_of_item_factor) %>% 
+  filter(n_nonmissing(answer) > 20) %>% 
+  ggplot(., aes(day_number, answer, colour = first_day_of_item_factor)) + 
+  geom_blank(aes(y = item_mean, ymin = item_mean - item_sd, ymax = item_mean + item_sd)) +
+  geom_hline(aes(yintercept = group_mean, group = label), color = "gray", linetype = 'dashed') +
+  geom_pointrange(position = position_dodge(width = 0.2), stat = 'summary', fun.data = 'mean_se') + 
+  geom_line(position = position_dodge(width = 0.4), stat = 'summary', fun.data = 'mean_se') + 
+  scale_color_colorblind("First day the\nitem was shown") +
+  scale_y_continuous("Response") +
+  facet_wrap(~ label_english, scales = "free_y", nrow = 3) + 
+  scale_x_continuous("Day number", breaks = 0:10)
+```
 
 ```{r fig.width=10,fig.height=8}
 predictors <- retention_items %>% 
@@ -1090,7 +1169,8 @@ all_biases %>%
   ggplot(aes(x = term, y = estimate, ymin = conf.low, ymax = conf.high)) +
   geom_hline(yintercept = 0, linetype = 'dashed') +
   facet_wrap(~ response) +
-  geom_pointrange() +
+  scale_y_continuous("95% CIs for regression coefficients") +
+  geom_linerange() +
   coord_flip()
 ```
 
@@ -1102,5 +1182,6 @@ predictors %>%
   map(~ cor(.$answer, residuals(lm(answer ~ items_shown + last_item + times_item_shown + day_number + refer_time_period, data = .)))) %>% 
   bind_rows() %>% 
   gather(item, cor) %>% 
-  arrange(cor)
+  arrange(cor) %>% 
+  knitr::kable()
 ```
