@@ -257,6 +257,15 @@ first_page %>% mutate(days = n_distinct(created)) %>% group_by(label_english) %>
   n = n_nonmissing(answer),
   pct_shown = round(n_nonmissing(answer)/first(days),1))
 
+first_page %>% mutate(days_tot = n_distinct(created)) %>% group_by(item_name, label_english, choices) %>% 
+  summarise(women = n_distinct(session),
+            days = n_distinct(unit_session_id),
+            per_woman = round(days/women),
+            mean = sprintf("%.2f", mean(answer, na.rm = T)),
+            sd = sprintf("%.2f", sd(answer, na.rm = T)),
+  pct_shown = round(days/first(days_tot),1)) %>% 
+  knitr::kable()
+
 first_page %>% ggplot(aes(answer)) + geom_bar() + facet_wrap(~ label_english, nrow = 2, scales = "free_y") +
   scale_x_continuous("Response", breaks = 0:4, labels = c("[0] less\nthan\nusual", 1, 2, 3, "[4] more\nthan\nusual"))
 
@@ -815,6 +824,24 @@ predictors %>%
 ```
 
 Not much at all.
+
+<details><summary>Allow individual differences in biases</summary>
+
+Here, we additionally residualise the item response for inter-individual person-level intercepts and then see whether further residualising for the average biases and person-level varying biases makes a large difference. It does not. In this model, only display order, number of items shown, and times item answered are adjusted for continuously, or the number of random effects would exceed the number of rows.
+
+```{r}
+predictors %>% 
+  split(.$item_name) %>%
+  map(~ cor(residuals(lmer(answer ~ (1 | session), .)), fitted(lmer(answer ~ scale(display_order) + scale(number_of_items_shown) + scale(times_item_answered) + (1 + scale(display_order) + scale(number_of_items_shown) + scale(times_item_answered) | session), data = .)))^2) %>% 
+  bind_rows() %>% 
+  gather(variable, cor) %>% 
+  arrange(cor) %>% 
+  knitr::kable()
+
+```
+
+</details>
+
 
 #### Regression table
 ```{r layout='l-body-outset'}
