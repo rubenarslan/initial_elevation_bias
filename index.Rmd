@@ -1,7 +1,7 @@
 ---
 editor_options:
   chunk_output_type: inline
-title: "Routinely randomise question display and order to estimate and adjust for biases."
+title: "Routinely randomise the display and order of items to estimate and adjust for biases in subjective reports"
 author:
   - name: "Ruben C. Arslan"
     url: https://rubenarslan.github.io
@@ -18,7 +18,7 @@ output:
 Replicating and extending [Shrout et al. (2017)](http://www.pnas.org/content/early/2017/12/12/1712277115.full), amending
 their recommendations.
 
-__Authors__: [Ruben C. Arslan](https://www.mpib-berlin.mpg.de/en/staff/ruben-arslan), Anne C. Reitz, Julie Driebe, Tanja Gerlach, & Lars Penke.
+__Authors__: [Ruben C. Arslan](https://www.mpib-berlin.mpg.de/en/staff/ruben-arslan), Anne K. Reitz, Julie C. Driebe, Tanja M. Gerlach, & Lars Penke.
 
 ```{r}
 source("../routine_and_sex/0_helpers.R")
