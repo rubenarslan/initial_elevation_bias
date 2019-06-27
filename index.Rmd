@@ -11,6 +11,7 @@ output:
   radix::radix_article: 
     toc: true
     toc_depth: 4
+    number_sections: true
     code_folding: 'hide'
     self_contained: false
 ---
@@ -40,6 +41,7 @@ diary = diary %>% filter(!is.na(ended_diary), day_number >= 0, day_number < 70) 
   mutate(days_done = max(days_done, na.rm = T), 
          didntmissfirstweek = all(1:7 %in% day_number),
          first_day = if_else(day_number == 0, 1, 0))
+
 
 diary_items <- formr::items(diary) %>% as.data.frame()
 
@@ -226,7 +228,7 @@ The following items were shown in random order on the first page of our diary.
 - I was satisfied with myself. (80%)
 - I was irritable. (40%)
 
-Participants (n=`r n_distinct(first_page$session)` women) could answer on a 5 point likert scale from "less than usual" to "more than usual". Pole labels were placed left and right of blank, equally sized buttons.
+Participants (n=`r n_distinct(first_page$session)` women) could answer on a 5 point likert scale from "less than usual" [0] to "more than usual" [4]. Pole labels were placed left and right of blank, equally sized buttons. Participants answered the diary on `r nrow(diary)` days in total, or on `r round(nrow(diary)/n_distinct(first_page$session))` days per woman.
 Because of our planned missing design with randomised display and order, participants saw only a subset of these items each day. Therefore, the following were randomised variables
 - the day an item was first shown (conditional on adjusting for day number), 
 - the number of times an item was seen previously (conditional as above). 
@@ -322,9 +324,11 @@ first_page %>% filter(response_time_since_previous < 1*30*1000, response_time_si
   geom_line(position = position_dodge(width = 0.4), stat ='summary', fun.y = function(x) { mean(x, na.rm =T, trim = 0.1) }) +
   scale_y_continuous("Response time since previous item (10% trimmed)") +
   facet_wrap(~ label_english)
+
+ggsave(width = 10, height = 8, filename = "Figure1.png")
 ```
 
-## Time series by first day item shown
+## Initial elevation
 
 In this graph, we show mean response to the item, depending on which day of the diary
 we first asked it. Different-coloured lines reflect different starting days. 
@@ -366,7 +370,7 @@ ggsave(first_page %>%
   scale_color_colorblind("First day the\nitem was shown") +
   scale_y_continuous("Response") +
   facet_wrap(~ label_english, scales = "free_y", nrow = 2) + 
-  scale_x_continuous("Day number", breaks = 0:10), width = 15, height = 8, filename = "Figure1.png")
+  scale_x_continuous("Day number", breaks = 0:10), width = 15, height = 8, filename = "Figure2.png")
 ```
 
 Here, we also show combinations with fewer than 20 participants.
@@ -543,7 +547,7 @@ first_page %>%
   scale_x_continuous("Item order", breaks = 1:6) +
   facet_wrap(~ label_english, scales = 'free_y')
 
-ggsave(width = 15, height = 8, filename = "Figure2.png")
+ggsave(width = 15, height = 8, filename = "Figure3.png")
 ```
 
 As above, we can not only examine the mean but also the relative frequencies of 
@@ -609,7 +613,7 @@ first_page %>%
   scale_x_continuous("Response", breaks = 0:4, labels = c("[0] less\nthan\nusual", 1, 2, 3, "[4] more\nthan\nusual")) +
   facet_wrap(~ label_english, scales = "free_y")
 
-ggsave(width = 15, height = 8, filename = "Figure4.png")
+ggsave(width = 15, height = 8, filename = "Figure5.png")
 ```
 
 Again, we can also examine the response time to each item according to item order.
@@ -643,7 +647,7 @@ first_page %>%
   coord_flip() +
   facet_wrap(~ label_english, scales = 'free_x')
 
-ggsave(width = 15, height = 8, filename = "Figure3.png")
+ggsave(width = 15, height = 8, filename = "Figure4.png")
 ```
 
 It is not possible to infer whether the item content would bias the next response
@@ -732,7 +736,7 @@ show_dt <- . %>%
   formatSignif(c("p.value"), digits = 5)
 ```
 
-### Basic model
+### Initial elevation bias
 Here, we are adjusting for day number (0 to 7+, larger numbers are binned because covariates can no longer be isolated) and the time period referred to. We also enter a random effect for which day the item was first shown, and the participant.
 
 ```{r}
@@ -751,6 +755,29 @@ initial_elevation_bias %>%
 
 ```{r layout='l-body-outset'}
 initial_elevation_bias %>% 
+  ggplot(aes(x = response, y = estimate, ymin = conf.low, ymax = conf.high)) +
+  geom_hline(yintercept = 0, linetype = 'dashed') +
+  geom_pointrange() +
+  coord_flip()
+```
+### Item order and number
+
+```{r}
+item_order_bias <- first_page %>% 
+  split(.$item_name) %>%
+  map(~ lmer(answer ~ day_number_factor + display_order  + number_of_items_shown + refer_time_period + (1 | session), data = .)) %>% 
+  map(~ tidy(., conf.int = TRUE)) %>% 
+  bind_rows(.id = "response") %>% 
+  filter(term %in% c("number_of_items_shown", "display_order"))
+```
+
+```{r layout='l-body-outset'}
+item_order_bias %>% 
+  show_dt()
+```
+
+```{r layout='l-body-outset'}
+item_order_bias %>% 
   ggplot(aes(x = response, y = estimate, ymin = conf.low, ymax = conf.high)) +
   geom_hline(yintercept = 0, linetype = 'dashed') +
   geom_pointrange() +
@@ -926,7 +953,7 @@ initial_elevation_bias_rt %>%
   geom_pointrange() +
   coord_flip()
 
-ggsave(width = 15, height = 8, filename = "Figure5.png")
+ggsave(width = 15, height = 8, filename = "Figure6.png")
 ```
 
 ### Regression table
