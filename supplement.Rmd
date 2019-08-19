@@ -1,25 +1,20 @@
 ---
 editor_options:
   chunk_output_type: inline
-title: "Routinely randomise the display and order of items to estimate and adjust for biases in subjective reports"
-author:
-  - name: "Ruben C. Arslan"
-    url: https://rubenarslan.github.io
-    affiliation_url: https://www.mpib-berlin.mpg.de/en/staff/ruben-arslan
-    affiliation: "Center for Adaptive Rationality, Max Planck Institute for Human Development, Berlin" 
-output:
-  radix::radix_article: 
-    toc: yes
-    toc_depth: 4
+title: "Routinely Randomize Potential Sources of Measurement Reactivity to Estimate and Adjust for Biases in Subjective Reports"
+output: 
+  pdf_document: 
+    latex_engine: xelatex
     number_sections: yes
-    code_folding: 'hide'
-    self_contained: no
+    toc: yes
+    toc_depth: 3
 ---
 
 Replicating and extending [Shrout et al. (2017)](http://www.pnas.org/content/early/2017/12/12/1712277115.full), amending
 their recommendations.
 
 # todo:
+- day number relative to first diary day
 - doch PDF supplement?
 - dropout analyse
 - proper merge fuer diary long und wide (min created auf stunde gerundet? oder einfach iterator?)
@@ -60,6 +55,8 @@ library(ggplot2)
 # library(svglite);
 library(ggthemes)
 library(codebook)
+library(kableExtra)
+library(paletteer)
 
 #' tidyverse: has a lot of naming conflicts, so always load last
 library(tidyverse)
@@ -73,19 +70,22 @@ options(width = 4000)
 ```{r}
 opts_chunk$set(fig.width = 15, fig.height = 8, dev = "CairoPNG")
 
-diary = diary %>% filter(!is.na(ended_diary), day_number >= 0, day_number < 70) %>% 
+diary = diary %>% 
+  drop_na(session, created_date) %>% 
+  group_by(session) %>% 
+  mutate(day_number = day_number - min(day_number, na.rm =T)) %>% 
   group_by(session) %>% 
   mutate(days_done = max(days_done, na.rm = T), 
          didntmissfirstweek = all(1:7 %in% day_number),
-         first_day = if_else(day_number == 0, 1, 0))
+         first_day = if_else(day_number == 0, 1, 0)) %>% 
+  ungroup() %>% 
+  filter(day_number >= 0, day_number < 70)
 
 ggplot(diary %>% filter(day_number == 0), aes(weekday)) + geom_bar()
-ggplot(diary %>% filter(day_number == 1), aes(weekday)) + geom_bar()
 ggplot(all_surveys %>% mutate(weekday = weekdays(created_demo)), aes(weekday)) + geom_bar()
 ```
 
 ```{r}
-diary_items <- formr::items(diary) %>% as.data.frame()
 questions <- rio::import("https://docs.google.com/spreadsheets/d/1Xo4fRvIzPYbWibVgJ9nm7vES39DSAWQBztnB8j7PdIo/edit#gid=232713254", format = "xlsx")
 # choices <- rio::import("https://docs.google.com/spreadsheets/d/1Xo4fRvIzPYbWibVgJ9nm7vES39DSAWQBztnB8j7PdIo/edit#gid=1837266155", which = 2)
 questions <- questions %>% 
@@ -117,13 +117,15 @@ if (!file.exists("../routine_and_sex/data/s3_daily_id_proc.rds")) {
     group_by(session) %>%
     mutate(
       created_date = as.Date(created - hours(10)),
-      day_number = round(as.numeric(created_date - min(created_date, na.rm = TRUE), unit = 'days')),
+      first_created_date = min(created_date, na.rm = TRUE),
       didntmissfirstweek = all(0:6 %in% day_number),
       first_day = if_else(day_number == 0, 1, 0),
       time_to_response_server = answered - shown,
       time_to_response = answered_relative - shown_relative) %>%
     group_by(session, unit_session_id) %>%
-    mutate(day_number = min(day_number, na.rm = TRUE)) %>%
+    mutate(
+      created_date = min(created_date, na.rm = TRUE),
+      day_number = round(as.numeric(created_date - first_created_date, unit = 'days'))) %>%
     group_by(session, item_name) %>%
     mutate(
            first_day_of_item = min(c(Inf, day_number[!is.na(answer)])),
@@ -151,10 +153,10 @@ if (!file.exists("../routine_and_sex/data/s3_daily_id_proc.rds")) {
   #       rename(item_name = name) %>% 
   #       select(item_name, label, showif, choices), 
   #     "item_name")
-    s3_daily_id <- s3_daily_id  %>% left_join(
-      questions %>% 
-      select(item_name = name, label_english = label_en, item_type = type, showif)
-    )
+  s3_daily_id <- s3_daily_id  %>% left_join(
+    questions %>% 
+    select(item_name = name, label_english = label_en, item_type = type, showif)
+  )
 
   
   s3_daily_id = s3_daily_id %>% 
@@ -166,6 +168,16 @@ if (!file.exists("../routine_and_sex/data/s3_daily_id_proc.rds")) {
   s3_daily_id = readRDS(file = "../routine_and_sex/data/s3_daily_id_proc.rds")
 }
 
+  s3_daily_id = s3_daily_id  %>% 
+    group_by(session) %>%
+    mutate(
+      created_date = as.Date(created - hours(10)),
+      first_created_date = min(created_date, na.rm = TRUE)) %>%
+    group_by(session, unit_session_id) %>%
+    mutate(
+      created_date = min(created_date, na.rm = TRUE),
+      day_number = round(as.numeric(created_date - first_created_date, unit = 'days'))) %>%
+    ungroup()
 
 # choices <- choices %>% 
 #   filter(!is.na(name), name != "") %>% 
@@ -175,11 +187,11 @@ if (!file.exists("../routine_and_sex/data/s3_daily_id_proc.rds")) {
 #     )
 
 s3_daily_id <- s3_daily_id  %>% left_join(
-  questions %>% 
-    select(item_name = name, label_english = label_en, item_type = type)
-  )
+    questions %>% 
+    select(item_name = name, label_english = label_en, item_type = type, showif)
+)
 
-s3_daily_id = s3_daily_id %>% 
+s3_daily_id_answered = s3_daily_id %>% 
   filter(!is.na(answer)) %>% 
   group_by(session, unit_session_id) %>% 
   mutate(first_item_on_first_day = display_order == 1 & first_day,
@@ -197,22 +209,22 @@ s3_daily_id = s3_daily_id %>%
                                   response_time_since_previous)) %>% 
   ungroup()
 
-s3_daily_id = s3_daily_id %>% 
+s3_daily_id_answered = s3_daily_id_answered %>% 
   group_by(session, item_name) %>% 
   arrange(session, item_name, unit_session_id) %>% 
   mutate(times_item_answered = cumsum(!is.na(answer)))
 
-s3_daily_id <- s3_daily_id %>% ungroup() %>% 
+s3_daily_id_answered <- s3_daily_id_answered %>% ungroup() %>% 
   mutate(
     times_item_answered_factor = factor(if_else(times_item_answered > 6, "7+", as.character(times_item_answered))),
     day_number_factor = factor(if_else(day_number > 6, "7+", as.character(day_number))),
     refer_time_period = recode(factor(refer_time_period), "in den letzten 24 Stunden" = "last 24 hours", "seit meinem letzten Eintrag" = "last entry")
 )
 
-s3_daily_id$label <- s3_daily_id$label_english
+s3_daily_id_answered$label <- s3_daily_id_answered$label_english
 
 
-s3_daily_id <- s3_daily_id %>% 
+s3_daily_id_answered <- s3_daily_id_answered %>% 
   filter(item_type %starts_with% "rating") %>% 
   mutate(answer = as.numeric(answer)) %>% 
   group_by(label_english) %>% 
@@ -220,7 +232,7 @@ s3_daily_id <- s3_daily_id %>%
          item_sd = sd(answer, na.rm = T)) %>% 
   ungroup()
 
-first_page = s3_daily_id  %>% 
+first_page = s3_daily_id_answered  %>% 
   filter(item_name %in% c("irritable", "self_esteem", "risk_taking", "good_mood", "loneliness", "stressed"))
 
 first_page = first_page %>% 
@@ -370,7 +382,7 @@ first_page %>% filter(response_time_since_previous < 1*30*1000, response_time_si
   ggplot(., aes(day_number, response_time_since_previous)) + 
   geom_pointrange(alpha = 0.3, position = position_dodge(width = 0.2), stat ='summary', fun.data = 'mean_se') + 
   geom_line(position = position_dodge(width = 0.4), stat ='summary', fun.y = function(x) { mean(x, na.rm =T, trim = 0.1) }) +
-  scale_y_continuous("Response time since previous item (10% trimmed)") +
+  scale_y_continuous("Response time (in ms) since previous item (10% trimmed)") +
   facet_wrap(~ label_english)
 
 ggsave(width = 10, height = 8, filename = "Figure1.png")
@@ -533,7 +545,7 @@ first_page %>%
   geom_line(position = position_dodge(width = 0.4), stat ='summary', fun.y = function(x) { mean(x, na.rm =T, trim = 0.1) }) +
   scale_color_colorblind("First day the\nitem was shown") +
   scale_x_continuous("Day number", breaks = 0:10) +
-  scale_y_continuous("Response time since previous item") +
+  scale_y_continuous("Response time (in ms) since previous item") +
   facet_wrap(~ label_english)
 ```
 
@@ -624,7 +636,7 @@ first_page %>% filter(response_time_since_previous < 1*30*1000, response_time_si
   ggplot(., aes(display_order, response_time_since_previous)) + 
   geom_pointrange(alpha = 0.3, position = position_dodge(width = 0.2), stat ='summary', fun.data = 'mean_se') + 
   geom_line(position = position_dodge(width = 0.4), stat ='summary', fun.y = function(x) { mean(x, na.rm =T, trim = 0.1) }) +
-  scale_y_continuous("Response time since previous item") +
+  scale_y_continuous("Response time (in ms) since previous item") +
   facet_wrap(~ label_english, scales = 'free_y')
 ```
 
@@ -671,7 +683,7 @@ first_page %>% filter(response_time_since_previous < 1*30*1000, response_time_si
   ggplot(., aes(number_of_items_shown, response_time_since_previous)) + 
   geom_pointrange(alpha = 0.3, position = position_dodge(width = 0.2), stat ='summary', fun.data = 'mean_se') + 
   geom_line(position = position_dodge(width = 0.4), stat ='summary', fun.y = function(x) { mean(x, na.rm =T, trim = 0.1) }) +
-  scale_y_continuous("Response time since previous item") +
+  scale_y_continuous("Response time (in ms) since previous item") +
   facet_wrap(~ label_english, scales = 'free_y')
 ```
 
@@ -1023,7 +1035,7 @@ the overall results (that residualising for estimated biases has negligible effe
 On  a "less than usual" to "more than usual" response scale.
 
 ```{r}
-time_items = s3_daily_id  %>% 
+time_items = s3_daily_id_answered  %>% 
   filter(item_name %starts_with% "time_") %>% 
   filter(hidden == 0, !is.na(answer)) %>% 
   group_by(session, unit_session_id) %>% 
@@ -1114,7 +1126,7 @@ On a "very inaccurate" to "very accurate" response scale.
 ip_desire_items <- c("in_pair_desire_7", "in_pair_desire_8",
                      "in_pair_desire_10", "in_pair_desire_11",
                      "in_pair_desire_13", "in_pair_desire_14")
-desire_items = s3_daily_id  %>% 
+desire_items = s3_daily_id_answered  %>% 
   filter(item_name %in% ip_desire_items) %>% 
   filter(hidden == 0, !is.na(answer)) %>% 
   group_by(session, unit_session_id) %>% 
@@ -1202,7 +1214,7 @@ predictors %>%
 On a "not at all" to "very much" response scale.
 
 ```{r}
-retention_items = s3_daily_id  %>% 
+retention_items = s3_daily_id_answered  %>% 
   filter(item_name %contains% "mate_retention") %>% 
   filter(hidden == 0, !is.na(answer)) %>% 
   group_by(session, unit_session_id) %>% 
@@ -1301,35 +1313,65 @@ non_unique_dates <- s3_daily_id %>%
   group_by(session, created_date) %>% 
   filter(n_distinct(unit_session_id) > 1)
 
-diary <- diary %>% anti_join(non_unique_dates)
-# non_unique_dates %>% group_by(session, unit_session_id, created_date) %>% summarise(n()) %>% arrange(created_date) %>% left_join(diary) %>% select(session, created_date, ended_diary)
-
-s3_daily_nr_items <- s3_daily_id %>% 
-  group_by(session, day_number) %>% 
-  summarise(nr_items_day = sum(!is.na(answer) & showif %contains% "runif", na.rm = TRUE))
-qplot(s3_daily_nr_items$nr_items_day)
-
 diary <- diary %>% 
   ungroup(session) %>% 
   mutate(session = as.factor(stringr::str_sub(session, 1, 7))) %>% 
-  left_join(s3_daily_nr_items, by = c("session", "day_number")) 
+  filter(!is.na(session), !is.na(created_date))
+
+diary <- diary %>% anti_join(non_unique_dates)
+
+un <- union(diary %>% select(session, created_date),  s3_daily_id%>% select(session, created_date))
+un <- setdiff(diary %>% select(session, created_date),  s3_daily_id%>% select(session, created_date))
+un <- setdiff(s3_daily_id %>% select(session, created_date), diary %>% select(session, created_date))
+
+# non_unique_dates %>% group_by(session, unit_session_id, created_date) %>% summarise(n()) %>% arrange(created_date) %>% left_join(diary) %>% select(session, created_date, ended_diary)
+
+diary %>% filter(is.na(ended_diary), !is.na(illness_pain)) %>% select(session, created_date)  %>% 
+  left_join(s3_daily_id) %>% 
+  filter(is.na(unit_session_id)) %>% 
+  head(20)
+
+s3_daily_nr_items <- s3_daily_id %>% 
+  group_by(session, unit_session_id, created_date) %>% 
+  summarise(nr_items_day = sum(hidden == 0 & showif %contains% "runif", na.rm = TRUE))
+
+diary <- diary %>% 
+  ungroup(session) %>% 
+  left_join(s3_daily_nr_items, by = c("session", "created_date")) 
+qplot(diary$nr_items_day)
 
 diary <- diary %>% 
   mutate(skipped_day = if_else(is.na(ended_diary), 1, 0),
-         finished_day = is.na(ended_diary)) %>% 
+         did_not_finish_entry = if_else(is.na(ended_diary) & !is.na(illness_pain), 1, 0),) %>% 
   group_by(session) %>% 
   mutate(lag_nr_items_day = lag(nr_items_day))
+
+crosstabs(~ did_not_finish_entry + skipped_day, diary)
 
 crosstabs(~ is.na(expired_diary) + is.na(ended_diary), diary)
 
 ggplot(diary, aes(lag_nr_items_day, skipped_day)) + 
   geom_pointrange(stat='summary', fun.data='mean_se') +
   geom_smooth() +
-  xlim(20, 37)
-ggplot(diary, aes(nr_items_day, skipped_day)) + 
-  geom_smooth()
+  geom_smooth(method = 'lm') +
+  xlim(10, 37)
 
-summary(lme4::lmer(skipped_day ~ lag_nr_items_day + nr_items_day + (1 + lag_nr_items_day + nr_items_day | session), diary))
+ggplot(diary, aes(nr_items_day, did_not_finish_entry)) + 
+  geom_pointrange(stat='summary', fun.data='mean_se') +
+  geom_smooth() +
+  geom_smooth(method = 'lm') +
+  xlim(15, 37)
+
+diary %>%  filter(!is.na(created_diary)) %>%  select(session, created_date, did_not_finish_entry, nr_items_day, lag_nr_items_day) %>% filter(did_not_finish_entry == 1) %>% arrange(session, created_date)
+
+summary(lme4::lmer(skipped_day ~ lag_nr_items_day + nr_items_day + (1 + lag_nr_items_day + nr_items_day | session), diary %>% ungroup() %>% filter(between(nr_items_day, 20,37),
+                                                                                                                                     between(lag_nr_items_day, 20,37))))
+summary(m1 <- lme4::glmer(skipped_day ~ lag_nr_items_day + (1 + lag_nr_items_day | session), diary %>% ungroup() %>% filter(between(lag_nr_items_day, 20,37)) %>% 
+                      mutate(lag_nr_items_day = lag_nr_items_day/10), family = binomial))
+plot(allEffects(m1))
+
+summary(lme4::glmer(skipped_day ~ lag_nr_items_day + (1 | session), diary %>% ungroup() %>% filter(between(lag_nr_items_day, 10,37)), family = binomial))
+summary(glm(skipped_day ~ lag_nr_items_day, diary %>% ungroup() %>% filter(between(lag_nr_items_day, 10,37)), family = binomial))
 ```
 
 ## Shrout S1
