@@ -1,0 +1,386 @@
+---
+editor_options:
+  chunk_output_type: inline
+title: "Wrangling: Routinely Randomize Potential Sources of Measurement Reactivity to Estimate and Adjust for Biases in Subjective Reports"
+output: 
+  html_document:
+    number_sections: yes
+    code_folding: "show"
+    toc: yes
+    toc_depth: 3
+---
+
+
+Here, we wrangle the data into shape. We mainly work with the raw long-form data
+(`s3_daily_id`), which has one row per person, diary day, and item. We merge
+in some information from the wide-form diary data (one row per person and diary day)
+that has been cleaned as part of another study to get information on reasons for 
+excluding data points and some other metadata.
+
+
+## Load R packages
+
+```{r}
+options(stringsAsFactors = FALSE)
+#' show two significant digits tops
+options(digits = 2)
+#' tend not to show scientific notation, because we're just psychologists
+options(scipen = 7)
+#' make output a bit wider
+options(width = 110)
+#' set a seed to make analyses depending on random number generation reproducible
+set.seed(1710) # if you use your significant other's birthday make sure you stay together for the sake of reproducibility
+
+
+#' ## Load packages
+#' generate the site
+library(rmarkdown)
+#' set options for chunks
+library(knitr)
+#' my formr utility package to generate e.g. the bibliography
+library(formr)
+#' pretty-printed output
+library(pander)
+#' tidyverse date times
+library(lubridate)
+#' tidyverse strings
+library(stringr)
+#' extractor functions for models
+library(broom)
+#' grammar of graphics plots
+library(ggplot2)
+#' svg graphs
+# library(svglite);
+library(feather)
+library(ggthemes)
+library(codebook)
+library(kableExtra)
+library(Cairo)
+library(paletteer)
+library(broom.mixed)
+
+#' tidyverse: has a lot of naming conflicts, so always load last
+library(tidyverse)
+opts_chunk$set(warning = F, message = F, error = TRUE,
+               fig.width = 15, fig.height = 8, dev = "CairoPNG")
+
+#' tidylog explains what is happening in our pipes
+library(tidylog)
+options(width = 4000)
+```
+## Load pre-cleaned wide diary data
+
+We exclude days outside the participation period (first 70 days after starting),
+which means excluding a small percentage of cases who went over this period because
+of programming errors etc.
+
+```{r}
+load("../routine_and_sex/cleaned_selected.rdata")
+diary = diary %>% 
+  filter(!is.na(session), !is.na(created_date)) %>%
+  group_by(session) %>% 
+  mutate(days_done = max(days_done, na.rm = T), 
+         didntmissfirstweek = all(0:6 %in% day_number),
+         first_day = if_else(day_number == 0, 1, 0)) %>% 
+  ungroup() %>% 
+  filter(day_number >= 0, day_number < 70) %>% 
+  mutate(session = as.factor(stringr::str_sub(session, 1, 7)))
+```
+## Load item metadata
+To determine the conditions under which attempts were shown and to translate labels.
+
+```{r}
+questions <- rio::import("s3_daily_revised.xlsx")
+questions <- questions %>% 
+  filter(!is.na(label_en), label_en != "") %>% 
+  mutate_if(is.character, ~ if_na(., "")) %>% 
+  select(type:label_en, showif)
+```
+
+Exclude some days (most exclusion criteria are menstrual cycle specific and irrelevant here).
+
+```{r}
+diary <- diary %>% filter(! reasons_for_exclusion %contains% "didnt_do_diary,",
+                                ! reasons_for_exclusion %contains% "dishonest_answer,")
+```
+
+## Load and process long-form diary data
+```{r}
+# s3_daily_id = jsonlite::fromJSON("../routine_and_sex/data/s3_daily_itemdisplay.json")
+# rio::export(s3_daily_id, "../routine_and_sex/data/s3_daily_itemdisplay.feather")
+s3_daily_id <- rio::import("../routine_and_sex/data/s3_daily_itemdisplay.feather")
+
+#  s3_daily_id  %>% 
+#    distinct(session) %>% 
+#   filter(is.na(session) | session %contains% "XXX")
+#  
+
+# set proper types
+s3_daily_id = s3_daily_id  %>%
+  filter(!is.na(session), !session %contains% "XXX") %>%
+  mutate(
+    created = as.POSIXct(created),
+    answered_relative = as.numeric(answered_relative),
+    shown_relative = as.numeric(shown_relative),
+    display_order = as.numeric(display_order),
+    hidden = as.numeric(hidden),
+    unit_session_id = as.numeric(unit_session_id),
+    saved = as.POSIXct(saved),
+    answered = as.POSIXct(answered),
+    shown = as.POSIXct(shown),
+    time_to_response_server = answered - shown,
+    time_to_response = answered_relative - shown_relative,
+    session = as.factor(stringr::str_sub(session, 1, 7)),
+    hidden = if_else(!is.na(answer), 0,
+                          if_else(hidden == 0, 0,
+                          1, 1))
+  )
+```
+
+Compute dates for each diary day
+
+```{r}
+s3_daily_id = s3_daily_id  %>%
+  group_by(session) %>% # group by woman
+    mutate( # turn item showtimes into dates
+      created_date = as.Date(created - hours(10)),
+      first_created_date = min(created_date, na.rm = TRUE)) %>% # day of starting the diary
+  group_by(session, unit_session_id) %>% # group by diary entry
+    mutate(
+      refer_time_period = answer[item_name == "refer_time_period"][1], # what time period was this entry referring to
+      created_date = min(created_date, na.rm = TRUE)) %>%  # date of this entry
+  ungroup()
+```
+
+```{r}
+non_unique_dates <- s3_daily_id %>% 
+  group_by(session, created_date) %>% 
+  filter(n_distinct(unit_session_id) > 1)
+# for 23 days there is some minor duplication
+nrow(non_unique_dates %>% group_by(session, created_date) %>% summarise(n()))
+
+# non_unique_dates %>% group_by(session, unit_session_id, created_date) %>% mutate(answered = sum(!is.na(answer))) %>%  filter(item_name == "illness_pain") %>% select(session, unit_session_id, created_date, answer, answered, day_number, created) %>% View
+
+# some diagnostic checking
+# only_in_diary <- setdiff(diary %>% filter(!is.na(created_diary)) %>% select(session, created_date), s3_daily_id %>% select(session, created_date))
+# # only_in_diary %>% select(session) %>% slice(1) %>% left_join(diary)%>% select(session, day_number,created_date, created_diary, ended_diary) %>% arrange(session, day_number) %>% distinct() %>% View("diary")
+# # only_in_diary %>% select(session) %>% slice(1) %>% left_join(s3_daily_id) %>% select(session, day_number, unit_session_id, created_date) %>% arrange(session, day_number) %>% distinct() %>% View("id")
+# # 
+# # only_in_diary %>% select(session) %>% slice(8) %>% left_join(s3_daily_id) %>% select(session, day_number, unit_session_id, created_date) %>% arrange(session, day_number) %>% distinct() %>% 
+# #   full_join(only_in_diary %>% select(session) %>% slice(8) %>% left_join(diary)%>% select(session, day_number,created_date, created_diary, ended_diary) %>% arrange(session, day_number) %>% distinct() ,by=c("session","created_date")) %>% View
+# 
+# only_in_id <- setdiff(s3_daily_id %>% select(session, created_date), diary %>% filter(!is.na(created_diary)) %>% select(session, created_date))
+# 
+# 
+# # only_in_id %>% slice(1) %>% left_join(s3_daily_id) %>% select(session, day_number, unit_session_id, created_date) %>% arrange(session, day_number) %>% distinct()  %>% mutate(id_only = 1) %>% 
+# #   full_join(only_in_id %>% select(session) %>% slice(1) %>% left_join(diary) %>% select(session, day_number,created_date, created_diary, ended_diary) %>% arrange(session, day_number) %>% distinct() ,by=c("session","created_date"), suffix = c("_id", "_diary")) %>% View
+# # 
+# # only_in_id %>% select(session) %>% slice(1) %>% left_join(diary)%>% select(session, day_number,created_date, created_diary, ended_diary) %>% arrange(session, day_number) %>% distinct() %>% View("diary")
+# # only_in_id %>% select(session) %>% slice(1) %>% left_join(s3_daily_id) %>% select(session, day_number, unit_session_id, created_date) %>% arrange(session, day_number) %>% distinct() %>% View("id")
+# 
+# in_both <- intersect(s3_daily_id %>% select(session, created_date), diary %>% filter(!is.na(created_diary)) %>% select(session, created_date))
+# 
+# cbind(id_only = nrow(only_in_id), diary_only = nrow(only_in_diary),both= nrow(in_both))
+
+
+## throw out non-unique dates
+s3_daily_id <- s3_daily_id %>% 
+  group_by(session, created_date) %>% 
+  filter(n_distinct(unit_session_id) == 1)
+
+
+## merge with diary, throw out dishonest reporting, days outside range etc.
+s3_daily_id = s3_daily_id  %>%
+  inner_join(diary %>% select(session, created_date, day_number, ended_diary), by = c("session", "created_date")) %>% 
+  group_by(session) %>% 
+    mutate(didntmissfirstweek = all(0:6 %in% day_number)) %>%   # did they do they whole first week
+  ungroup()
+```
+
+Compute randomised variables.
+
+```{r}
+## compute relevant variables
+s3_daily_id = s3_daily_id  %>%
+  group_by(session, item_name) %>%
+    mutate(
+      first_day_of_item = min(c(Inf, day_number[!is.na(answer)])), # compute first day item was answered
+      first_day_of_item = if_else(is.finite(first_day_of_item),    # treat problems
+                                       first_day_of_item,
+                                       NA_real_),
+      first_day_of_item_factor = if_else(first_day_of_item > 6, "7+", as.character(first_day_of_item)), #categorise
+      first_day_of_item_shown = first_day_of_item == day_number) %>% # dummy for the day the item was first shown
+ ungroup() %>% 
+ mutate(first_day_of_item_factor = factor(first_day_of_item_factor))
+
+crosstabs(~ (!is.na(displaycount) & displaycount>0) + hidden + is.na(answer), data = s3_daily_id)
+
+  
+# s3_daily_id <- s3_daily_id %>% 
+#   left_join(
+#     diary_items %>% 
+#       rename(item_name = name) %>% 
+#       select(item_name, label, showif, choices), 
+#     "item_name")
+s3_daily_id <- s3_daily_id  %>% left_join(
+  questions %>% 
+  select(item_name = name, label_english = label_en, item_type = type, showif)
+)
+
+s3_daily_id = s3_daily_id %>% 
+  group_by(session, item_name) %>% 
+  arrange(session, item_name, unit_session_id) %>% 
+  mutate(times_item_answered = cumsum(!is.na(answer))) %>% 
+  ungroup() %>% 
+  mutate(
+    times_item_answered_factor = factor(if_else(times_item_answered > 6, "7+", as.character(times_item_answered))),
+    day_number_factor = factor(if_else(day_number > 6, "7+", as.character(day_number))),
+    refer_time_period = recode(factor(refer_time_period), "in den letzten 24 Stunden" = "last 24 hours", "seit meinem letzten Eintrag" = "last entry"),
+    label = label_english
+)
+```
+
+Focus on questions that were answered to make it easier to compute display order 
+and last item.
+
+```{r warning=FALSE}
+s3_daily_id_answered = s3_daily_id %>% 
+  filter(!is.na(answer)) %>% 
+  group_by(session, unit_session_id) %>% 
+  mutate(number_of_items_shown = n()) %>% 
+  arrange(session, unit_session_id, display_order) %>% 
+  group_by(session, unit_session_id) %>% 
+  mutate(
+    last_answer = lag(answer),
+    response_time_since_previous = answered_relative - lag(answered_relative),
+    response_time_pl_sp = if_else(is.na(response_time_since_previous), 
+                                  if_else(
+                                    answered_relative == min(answered_relative, na.rm = TRUE), 
+                                    answered_relative - shown_relative, 
+                                    NA_real_), 
+                                  response_time_since_previous)) %>% 
+  ungroup()
+```
+
+focus on rating items, subject of this investigation anyway, to compute item means and SDs
+
+```{r}
+s3_daily_id_answered <- s3_daily_id_answered %>% 
+  filter(item_type %starts_with% "rating") %>% 
+  mutate(answer = as.numeric(answer)) %>% 
+  group_by(label_english) %>% 
+  mutate(item_mean = mean(answer, na.rm = T),
+         item_sd = sd(answer, na.rm = T)) %>% 
+  ungroup()
+
+
+s3_daily_nr_items <- s3_daily_id %>% 
+  drop_na(created) %>%
+  group_by(session, unit_session_id, created_date) %>% 
+  summarise(nr_items_day = sum(hidden == 0 & showif %contains% "runif", na.rm = TRUE))
+
+diary <- diary %>% 
+  ungroup(session) %>% 
+  inner_join(s3_daily_nr_items, by = c("session", "created_date")) 
+
+qplot(diary$nr_items_day)
+
+diary <- diary %>% 
+  mutate(skipped_day = if_else(is.na(ended_diary), 1, 0),
+         did_not_finish_entry = if_else(is.na(ended_diary) & !is.na(illness_pain), 1, 0),) %>% 
+  group_by(session) %>% 
+  mutate(lag_nr_items_day = lag(nr_items_day))
+```
+
+
+## Save processed data
+
+Save long-format tables
+
+```{r}
+rio::export(diary, "../routine_and_sex/data/diary_item_data.feather")
+rio::export(s3_daily_id, "../routine_and_sex/data/s3_daily_itemdisplay_processed.feather")
+rio::export(s3_daily_id_answered, "../routine_and_sex/data/s3_daily_id_answered.feather")
+# s3_daily_id <- rio::import("../routine_and_sex/data/s3_daily_itemdisplay_processed.feather")
+```
+
+Save general first page state items
+
+```{r}
+first_page = s3_daily_id_answered  %>% 
+  filter(item_name %in% c("irritable", "self_esteem", "risk_taking", "good_mood", "loneliness", "stressed"))
+
+first_page = first_page %>% 
+  filter(hidden == 0, !is.na(answer)) %>% 
+  group_by(session, unit_session_id) %>% 
+  mutate(display_order = min_rank(display_order),
+         number_of_items_shown = n()) %>%  
+  arrange(session, unit_session_id, display_order) %>% 
+  mutate(
+        last_item = if_na(lag(item_name), "none")) %>% 
+  ungroup() %>% 
+  mutate(last_item = relevel(factor(last_item), ref =  "none"))
+
+rio::export(first_page, "../routine_and_sex/data/first_page.feather")
+```
+
+Save time use items
+
+
+```{r}
+time_items = s3_daily_id_answered  %>% 
+  filter(item_name %starts_with% "time_") %>% 
+  filter(hidden == 0, !is.na(answer)) %>% 
+  group_by(session, unit_session_id) %>% 
+  mutate(display_order = min_rank(display_order),
+         number_of_items_shown = n()) %>%  
+  arrange(session, unit_session_id, display_order) %>% 
+  mutate(
+        last_item = if_na(lag(item_name), "none")) %>% 
+  ungroup() %>% 
+  mutate(last_item = relevel(factor(last_item), ref =  "none"))
+
+rio::export(time_items, "../routine_and_sex/data/time_items.feather")
+```
+
+Save intra-pair desire items
+
+```{r}
+ip_desire_items <- c("in_pair_desire_7", "in_pair_desire_8",
+                     "in_pair_desire_10", "in_pair_desire_11",
+                     "in_pair_desire_13", "in_pair_desire_14")
+desire_items = s3_daily_id_answered  %>% 
+  filter(item_name %in% ip_desire_items) %>% 
+  filter(hidden == 0, !is.na(answer)) %>% 
+  group_by(session, unit_session_id) %>% 
+  mutate(display_order = min_rank(display_order),
+         number_of_items_shown = n()) %>%  
+  arrange(session, unit_session_id, display_order) %>% 
+  mutate(
+        last_item = if_na(lag(item_name), "none")) %>% 
+  ungroup() %>% 
+  mutate(last_item = relevel(factor(last_item), ref =  "none"))
+
+rio::export(desire_items, "../routine_and_sex/data/desire_items.feather")
+```
+
+Save mate retention items
+
+```{r}
+retention_items = s3_daily_id_answered  %>% 
+  filter(item_name %contains% "mate_retention") %>% 
+  filter(hidden == 0, !is.na(answer)) %>% 
+  group_by(session, unit_session_id) %>% 
+  mutate(display_order = min_rank(display_order),
+         number_of_items_shown = n()) %>%  
+  arrange(session, unit_session_id, display_order) %>% 
+  mutate(
+        last_item = if_na(lag(item_name), "none")) %>% 
+  ungroup() %>% 
+  mutate(last_item = relevel(factor(last_item), ref =  "none"))
+
+rio::export(retention_items, "../routine_and_sex/data/retention_items.feather")
+```
+
+
+

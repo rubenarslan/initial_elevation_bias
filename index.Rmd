@@ -73,14 +73,14 @@ options(width = 4000)
 ```{r}
 opts_chunk$set(fig.width = 15, fig.height = 8, dev = "CairoPNG")
 
-diary = diary %>% filter(!is.na(ended_diary), day_number >= 0, day_number < 70) %>% 
+diary = diary %>% 
+  filter(day_number >= 0, day_number < 70) %>% 
   group_by(session) %>% 
   mutate(days_done = max(days_done, na.rm = T), 
          didntmissfirstweek = all(1:7 %in% day_number),
          first_day = if_else(day_number == 0, 1, 0))
 
-ggplot(diary %>% filter(day_number == 0), aes(weekday)) + geom_bar()
-ggplot(diary %>% filter(day_number == 1), aes(weekday)) + geom_bar()
+ggplot(diary %>% drop_na(created_diary) %>% filter(day_number == 0), aes(weekday)) + geom_bar()
 ggplot(all_surveys %>% mutate(weekday = weekdays(created_demo)), aes(weekday)) + geom_bar()
 ```
 
