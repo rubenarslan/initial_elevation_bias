@@ -241,7 +241,6 @@ s3_daily_id = s3_daily_id %>%
 )
 ```
 
-
 Focus on questions that were answered to make it easier to compute display order 
 and last item.
 
@@ -276,6 +275,7 @@ s3_daily_id_answered <- s3_daily_id_answered %>%
   ungroup()
 ```
 
+
 Count number of randomised items per day
 ```{r}
 s3_daily_nr_items <- s3_daily_id %>% 
@@ -287,13 +287,23 @@ diary <- diary %>%
   ungroup(session) %>% 
   inner_join(s3_daily_nr_items, by = c("session", "created_date")) 
 
+
 diary <- diary %>% 
   mutate(skipped_day = if_else(is.na(ended_diary), 1, 0),
          did_not_finish_entry = if_else(is.na(ended_diary) | is.na(illness_pain), 1, 0),
          nr_items_day_done = if_else(did_not_finish_entry == 1, NA_integer_, nr_items_day)) %>% 
   group_by(session) %>% 
-  mutate(lag_nr_items_day = lag(nr_items_day_done))
+  arrange(created_date) %>% 
+  mutate(
+    lag_nr_items_day = lag(nr_items_day_done),
+    lag_finished_entry = lag(did_not_finish_entry))
+
+ggplot(diary, aes(nr_items_day_done)) + 
+  geom_bar()
+
+crosstabs(~ is.na(illness_pain) + did_not_finish_entry, diary)
 ```
+
 
 ## Save data
 Remove unused variables to reduce risk of re-identification
@@ -324,7 +334,7 @@ stopifnot(!is.null(var_label(diary$relationship_status))) # keep labels
 diary <- diary %>% select(session, didntmissfirstweek, hetero_relationship,
                           age, education_years, has_children, nr_children, relationship_status,
                           occupational_status,
-                          day_number, did_not_finish_entry, skipped_day,
+                          day_number, did_not_finish_entry, skipped_day, lag_finished_entry,
                           nr_items_day_done, lag_nr_items_day)
 encrypt(saveRDS(diary, "diary.rds"), key)
 encrypt(write.csv(diary, "diary.csv"), key)
