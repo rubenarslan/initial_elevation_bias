@@ -15,6 +15,12 @@ output:
 ---
 
 
+todo:
+- make figures and tables for multilevel model (take code from 2_)
+- frame other models as robustness checks
+  - complete first week
+  - 
+
 ```{r}
 options(stringsAsFactors = FALSE)
 #' show two significant digits tops
@@ -311,7 +317,7 @@ first_page %>%
 ```
 
 
-```{r fig.cap="As above, we can not only examine the mean but also the relative frequencies of  each response."}
+```{r fig.cap="As above, we can not only examine the mean but also the relative frequencies of  each response.", fig.width=10}
 first_page %>% 
   group_by(label_english, item_name, last_item) %>% 
   mutate(group_n = n_nonmissing(answer)) %>% 
@@ -330,12 +336,9 @@ first_page %>%
 We have investigated each randomised variable in turn, but we also noted that
 item order and number of items shown are confounded with one another. In addition,
 the first day an item is shown is likely to be an earlier day of the diary, where we might
-expect to see selection bias. Further, we varied the instructions in the diary depending
-on how long ago the last diary was answered. We instructed participants to refer to the time period since their last diary entry, if that had happened within the last 24 hours, or to the last 24 hours, if the last diary entry was longer ago (and if it was their first diary entry).
-
-In addition, a more generalised understanding of the initial elevation bias might 
-lead us to believe that responses are continuously elevated more, 
-the fewer times an item has been shown. 
+expect to see selection bias, and it's more likely to be a weekday, not a weekend day. 
+Further, we varied the instructions in the diary depending on how long ago the last diary was answered. 
+We instructed participants to refer to the time period since their last diary entry, if that had happened within the last 24 hours, or to the last 24 hours, if the last diary entry was longer ago (and if it was their first diary entry).
 
 A natural way to disentangle these confounds is to simultaneously enter them into a 
 regression. We fit one multilevel regression per item in lme4.
@@ -345,12 +348,6 @@ regression. We fit one multilevel regression per item in lme4.
 library(lme4)
 library(lmerTest)
 library(purrr)
-library(DT)
-show_dt <- . %>% 
-  datatable(rownames = FALSE, filter = "top", options = list( pageLength = 200)) %>% 
-  formatRound(c("estimate", "std.error", "statistic", "conf.low", "conf.high"), digits = 2) %>% 
-  formatRound(c("df"), digits = 0) %>%
-  formatSignif(c("p.value"), digits = 5)
 ```
 
 ### Initial elevation bias
@@ -896,3 +893,61 @@ predictors %>%
   knitr::kable()
 ```
 
+
+## Dropout
+
+The additional workload on each day (total number of randomised items that were shown)
+is a random variable, conditional on relationship status (women in relationships had
+to answer slightly more questions, some of which were also randomised in appearance). 
+We can use this variable to predict whether a woman who had to answer more questions
+is less likely to answer the diary on the next day.
+
+```{r}
+crosstabs(~ did_not_finish_entry + skipped_day, diary)
+
+ggplot(diary, aes(nr_items_day_done, fill = factor(hetero_relationship))) + 
+  geom_bar() +
+  scale_fill_colorblind(guide = FALSE) +
+  facet_wrap(~ hetero_relationship, labeller = as_labeller(c("0" = "single", "1" = "in relationship")))
+
+
+ggplot(diary %>% group_by(hetero_relationship, lag_nr_items_day) %>% 
+         summarise(count = n(),
+                   skip = mean(skipped_day, na.rm = T)), aes(lag_nr_items_day, count, fill = skip)) + 
+  geom_bar(stat = 'identity') +
+  scale_color_viridis_c() +
+  facet_wrap(~ hetero_relationship, labeller = as_labeller(c("0" = "single", "1" = "in relationship")))
+
+ggplot(diary, aes(lag_nr_items_day, skipped_day, color = factor(hetero_relationship))) + 
+  geom_pointrange(stat='summary', fun.data='mean_cl_boot', alpha = 0.5) +
+  geom_smooth(method = 'glm', method.args = list(family = binomial())) +
+  scale_color_colorblind(guide = F) +
+  facet_wrap(~ hetero_relationship, labeller = as_labeller(c("0" = "single", "1" = "in relationship")))
+
+library(Hmisc)
+ggplot(diary %>% 
+         group_by(hetero_relationship, lag_nr_items_day) %>% 
+         filter(n() > 100), aes(lag_nr_items_day, skipped_day, color = factor(hetero_relationship))) + 
+  geom_pointrange(stat='summary', fun.data='mean_cl_boot', alpha = 0.5) +
+  geom_smooth(method = 'glm', method.args = list(family = binomial())) +
+  scale_color_colorblind(guide = F) +
+  facet_wrap(~ hetero_relationship, labeller = as_labeller(c("0" = "single", "1" = "in relationship")))
+
+summary(m1 <- lme4::glmer(skipped_day ~ lag_nr_items_day * hetero_relationship + (1 + lag_nr_items_day | session), diary %>% ungroup() %>% 
+                      mutate(lag_nr_items_day = lag_nr_items_day/10), family = binomial))
+
+library(effects)
+plot(allEffects(m1))
+coef(m1)$session %>% as_tibble(rownames = "session") %>% 
+  left_join(diary %>% select(session, hetero_relationship) %>% distinct(), by = 'session', suffix = c("_est", "")) %>% 
+  arrange(lag_nr_items_day) %>% 
+  mutate(woman = fct_inorder(session)) %>% 
+ggplot(aes(woman, lag_nr_items_day, color = factor(hetero_relationship))) +
+  geom_point() +
+  coord_flip()  +
+  scale_color_colorblind(guide = F) +
+  facet_wrap(~ hetero_relationship, labeller = as_labeller(c("0" = "single", "1" = "in relationship")))
+  
+
+summary(glm(skipped_day ~ lag_nr_items_day, diary %>% ungroup() %>% filter(between(lag_nr_items_day, 10,37)), family = binomial))
+```
