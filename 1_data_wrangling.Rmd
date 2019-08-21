@@ -274,19 +274,25 @@ s3_daily_id_answered <- s3_daily_id_answered %>%
   mutate(item_mean = mean(answer, na.rm = T),
          item_sd = sd(answer, na.rm = T)) %>% 
   ungroup()
+```
+
+Count number of randomised items per day
+```{r}
 s3_daily_nr_items <- s3_daily_id %>% 
   drop_na(created) %>%
   group_by(session, unit_session_id, created_date) %>% 
   summarise(nr_items_day = sum(hidden == 0 & showif %contains% "runif", na.rm = TRUE))
+
 diary <- diary %>% 
   ungroup(session) %>% 
   inner_join(s3_daily_nr_items, by = c("session", "created_date")) 
-qplot(diary$nr_items_day)
+
 diary <- diary %>% 
   mutate(skipped_day = if_else(is.na(ended_diary), 1, 0),
-         did_not_finish_entry = if_else(is.na(ended_diary) & !is.na(illness_pain), 1, 0),) %>% 
+         did_not_finish_entry = if_else(is.na(ended_diary) | is.na(illness_pain), 1, 0),
+         nr_items_day_done = if_else(did_not_finish_entry == 1, NA_integer_, nr_items_day)) %>% 
   group_by(session) %>% 
-  mutate(lag_nr_items_day = lag(nr_items_day))
+  mutate(lag_nr_items_day = lag(nr_items_day_done))
 ```
 
 ## Save data
