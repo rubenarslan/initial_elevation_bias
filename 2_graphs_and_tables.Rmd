@@ -59,21 +59,30 @@ theme_set(theme_classic() + theme_pander(base_size = 18))
 
 
 ```{r}
-load("../routine_and_sex/cleaned_selected.rdata")
-diary <- rio::import("../routine_and_sex/data/diary_item_data.feather")
-s3_daily_id <- rio::import("../routine_and_sex/data/s3_daily_itemdisplay_processed.feather")
+key <- keyring::key_get_raw("encrypt_data_routinely_randomise")
+class(key) <- c("aes", "raw")
+key <- cyphr::key_openssl(key)
+s3_daily_id_answered <- cyphr::decrypt(readRDS("s3_daily_id_answered.rds"), key)
+diary <- cyphr::decrypt(readRDS("diary.rds"), key)
+
 s3_daily_id_answered <-  rio::import("../routine_and_sex/data/s3_daily_id_answered.feather")
-first_page <-  rio::import("../routine_and_sex/data/first_page.feather")
-time_items <-  rio::import("../routine_and_sex/data/time_items.feather")
-desire_items <-  rio::import("../routine_and_sex/data/desire_items.feather")
-retention_items <- rio::import("../routine_and_sex/data/retention_items.feather")
+
+first_page = s3_daily_id_answered  %>% 
+  filter(item_name %in% c("irritable", "self_esteem", "risk_taking", "good_mood", "loneliness", "stressed")) %>% 
+  group_by(session, unit_session_id) %>% 
+  mutate(display_order = min_rank(display_order),
+         number_of_items_shown = n()) %>%  
+  arrange(session, unit_session_id, display_order) %>% 
+  mutate(
+        last_item = if_na(lag(label_english), "[None]")) %>% 
+  ungroup() %>% 
+  mutate(last_item = relevel(factor(last_item), ref =  "[None]"))
 ```
 
 
 
 
-
-## Description
+# Description
 The following items were shown in random order on the first page of our diary. 
 
 - I was stressed. (40% probability of being shown)
@@ -90,7 +99,7 @@ Because of our planned missing design with randomised display and order, partici
 - the number of items on that day.
 - the display order.
 
-### Table 1
+## Table 1
 ```{r}
 first_page %>% mutate(days_tot = n_distinct(created)) %>% group_by(label_english) %>% 
   summarise(women = n_distinct(session),
@@ -102,7 +111,7 @@ first_page %>% mutate(days_tot = n_distinct(created)) %>% group_by(label_english
   knitr::kable()
 ```
 
-### Table 2
+## Table 2
 ```{r}
 first_page %>% 
   mutate(first_day_of_item = if_else(first_day_of_item > 6, "7+", as.character(first_day_of_item))) %>% 
@@ -118,9 +127,9 @@ Information for the narrative description of the study.
 
 ```{r}
 skimr::skim_with(haven_labelled = skimr::get_skimmers()$numeric)
-all_surveys <- first_page %>% select(session) %>% distinct() %>% 
-  left_join(
-    all_surveys %>% mutate(session = stringr::str_sub(session, 1, 7)))
+all_surveys <- diary %>% select(session, didntmissfirstweek, hetero_relationship,
+                          age, education_years, has_children, nr_children, relationship_status,
+                          occupational_status)
 
 first_page %>% group_by(session, unit_session_id) %>% 
   summarise(answered = any(!is.na(answer))) %>% 
@@ -155,6 +164,7 @@ first_page %>%
 ```
 
 
+# Bias tests
 
 ## Figure 1
 We showed above that responses do not drift much over time in the diary. But do
@@ -162,10 +172,10 @@ participants learn to respond more quickly?
 
 ```{r}
 first_page %>% filter(response_time_since_previous < 1*30*1000, response_time_since_previous > 0, display_order > 1) %>% 
-  ggplot(., aes(day_number, response_time_since_previous)) + 
+  ggplot(., aes(day_number, response_time_since_previous/1000)) + 
   geom_pointrange(alpha = 0.3, position = position_dodge(width = 0.2), stat ='summary', fun.data = 'mean_se') + 
-  geom_line(position = position_dodge(width = 0.4), stat ='summary', fun.y = function(x) { mean(x, na.rm =T, trim = 0.1) }) +
-  scale_y_continuous("Response time (in ms) since previous item (10% trimmed)") +
+  geom_line(position = position_dodge(width = 0.4), stat ='summary', fun.y = function(x) { mean(x, na.rm =T, trim = 0.10) }) +
+  scale_y_continuous("Response time (in s) since previous item") +
   facet_wrap(~ label_english)
 
 ggsave(width = 10, height = 8, filename = "Figure1.png")
@@ -215,7 +225,7 @@ of items shown on each page. For example, an item order of six only occurs when 
 first_page %>%
   ggplot(., aes(display_order, answer)) + 
   geom_blank(aes(y = item_mean, ymin = item_mean - item_sd, ymax = item_mean + item_sd)) +
-  geom_smooth(aes(group = session), method = 'lm', color = "#00000022", se = FALSE) +
+  # geom_smooth(aes(group = session), method = 'lm', color = "#00000011", se = FALSE) +
   geom_pointrange(position = position_dodge(width = 0.2), stat = 'summary', fun.data = 'mean_se') + 
   geom_line(position = position_dodge(width = 0.4), stat = 'summary', fun.data = 'mean_se') + 
   scale_y_continuous("Response") +
@@ -276,9 +286,67 @@ ggsave(width = 15, height = 8, filename = "Figure5.png")
 ```
 
 
-## Figure 6: Response time Multilevel models
+### Continuous predictors
+```{r fig.width=12, fig.height=6}
+predictors <- first_page %>% 
+  mutate(item_order = display_order,
+         times_item_shown = times_item_answered,
+         items_shown = number_of_items_shown
+         )
+library(lme4)
+library(lmerTest)
+library(broom.mixed)
+complex_mods <-  predictors %>% 
+  split(.$item_name) %>%
+  map(~ lmer(answer ~ items_shown + item_order + times_item_shown + poly(scale(day_number, scale=F)/10, degree = 3, raw = T) + refer_time_period +  (1 | session), data = .))
 
-### Continuous items shown model
+complex_mods <-  predictors %>% 
+  split(.$item_name) %>%
+  map(~ lmer(answer ~ weekday + items_shown + item_order + times_item_shown + poly(scale(day_number, scale=F)/10, degree = 3, raw = T) + refer_time_period +  (1 | session), data = .))
+
+all_biases <- complex_mods %>% 
+  map(~ tidy(., conf.int = TRUE, conf.level = 0.99)) %>% 
+  bind_rows(.id = "response") 
+
+
+all_biases %>% 
+  filter(is.na(group)) %>% 
+  filter(term != "(Intercept)") %>% 
+  left_join(
+    first_page %>% select(response = item_name, item = label_english, item_mean, item_sd) %>% distinct()
+  ) %>% 
+  mutate(term = fct_relevel(fct_recode(term, 
+                           "R. No. times item shown" = "times_item_shown",
+                           "Ref: since last entry" = "refer_time_periodlast entry",
+                           "R. No. items shown" = "items_shown",
+                           "R. Item order" = "item_order",
+                           "Day" = "poly(scale(day_number, scale = F)/10, degree = 3, raw = T)1",
+                           "Day^2" = "poly(scale(day_number, scale = F)/10, degree = 3, raw = T)2",
+                           "Day^3" = "poly(scale(day_number, scale = F)/10, degree = 3, raw = T)3"),
+                           "R. No. items shown", 
+                           "R. No. times item shown", 
+                           "R. Item order",
+                           "Ref: since last entry",
+                           "Day^3",
+                           "Day^2",
+                           "Day")
+                           ) %>% 
+  # filter(term != "refer_time_periodlast entry", 
+         # str_sub(term, 1, 10) != "day_number", term != "(Intercept)", !is.na(conf.high)) %>% 
+  ggplot(aes(x = term, y = estimate, ymin = conf.low, ymax = conf.high)) +
+  geom_rect(ymin = -0.1, ymax = 0.1, xmin = -Inf, xmax = Inf, fill = "lightblue", alpha = 0.5) +
+  # geom_blank(aes(y = estimate, ymin = estimate - item_sd, ymax = estimate + item_sd)) +
+  geom_hline(yintercept = 0, linetype = 'dashed') +
+  ggrepel::geom_text_repel(aes(label = sprintf("%.2f",estimate)), force = 0, nudge_x = 0.35, segment.size = 0) +
+  facet_wrap(~ item) +
+  geom_pointrange() +
+  coord_flip()
+
+ggsave(width = 12, height = 6, filename = "Figure6.png")
+```
+
+## Figure 7: Response time Multilevel models
+
 Testing the times the item was seen already (reference category: first day) as a factor variable, rather than yes/no.
 
 adjusting for day number (0 to 7+), the time period referred to (affected by how often people have responded so far), which day the item was first shown, the day number, and a random effect for the woman.
@@ -299,8 +367,9 @@ library(lmerTest)
 
 complex_mods <-  predictors %>% 
   split(.$item_name) %>%
-  map(~ lmer(response_time_since_previous ~ items_shown + item_order + times_item_shown + day_number + refer_time_period +  (1 | session), data = .))
-
+  map(~ lmer(response_time_since_previous/1000 ~ items_shown + item_order + times_item_shown + poly(scale(day_number, scale=F)/10, degree = 3, raw = T) + refer_time_period +  (1 | session), data = .))
+# summary(lmer(response_time_since_previous/1000 ~ items_shown + item_order + times_item_shown + poly(scale(day_number, scale=F)/10, degree = 3, raw = T) + refer_time_period +  (1 | session), data = predictors %>% filter(item_name == 'good_mood')))
+# qplot(predictors$response_time_since_previous/1000)
 
 initial_elevation_bias_rt <- complex_mods %>% 
   map(~ tidy(., conf.int = TRUE, conf.level = 0.99)) %>% 
@@ -310,20 +379,91 @@ initial_elevation_bias_rt <- complex_mods %>%
 initial_elevation_bias_rt %>% 
   left_join(first_page %>% select(response = item_name, label_english) %>% unique()) %>% 
   filter(term != "refer_time_periodlast entry", term != "(Intercept)", !is.na(conf.high)) %>% 
-  mutate(term = fct_recode(term, 
-                           "No. times item shown" = "times_item_shown",
-                           "No. items shown" = "items_shown",
-                           "Item order" = "item_order",
-                           "Day number" = "day_number")) %>% 
+  mutate(term = fct_relevel(fct_recode(term, 
+                           "R. No. times item shown" = "times_item_shown",
+                           "Ref: since last entry" = "refer_time_periodlast entry",
+                           "R. No. items shown" = "items_shown",
+                           "R. Item order" = "item_order",
+                           "Day" = "poly(scale(day_number, scale = F)/10, degree = 3, raw = T)1",
+                           "Day^2" = "poly(scale(day_number, scale = F)/10, degree = 3, raw = T)2",
+                           "Day^3" = "poly(scale(day_number, scale = F)/10, degree = 3, raw = T)3"),
+                           "R. No. items shown", 
+                           "R. No. times item shown", 
+                           "R. Item order",
+                           "Ref: since last entry",
+                           "Day^3",
+                           "Day^2",
+                           "Day")
+                           ) %>%
   ggplot(aes(x = term, y = estimate, ymin = conf.low, ymax = conf.high)) +
   geom_hline(yintercept = 0, linetype = 'dashed') +
-  facet_wrap(~ label_english) +
-  scale_y_continuous("Estimated effect on response time (in ms)") +
   geom_pointrange() +
+  ggrepel::geom_text_repel(aes(label = sprintf("%.2f",estimate)), force = 0, nudge_x = 0.35, segment.size = 0) +
+  scale_y_continuous("Estimated effect on response time (in s)") +
+  facet_wrap(~ label_english) +
   coord_flip()
 
-ggsave(width = 15, height = 8, filename = "Figure6.png")
+ggsave(width = 12, height = 6, filename = "Figure7.png")
 ```
 
 
 
+
+## Figure 8: Dropout
+The additional workload on each day (total number of randomised items that were shown)
+is a random variable, conditional on relationship status (women in relationships had
+to answer slightly more questions, some of which were also randomised in appearance). 
+We can use this variable to predict whether a woman who had to answer more questions
+is less likely to answer the diary on the next day.
+
+```{r}
+
+qplot(diary$lag_nr_items_day)
+crosstabs(~ did_not_finish_entry + skipped_day, diary)
+
+ggplot(diary, aes(nr_items_day_done, fill = factor(hetero_relationship))) + 
+  geom_bar() +
+  scale_fill_colorblind(guide = FALSE) +
+  facet_wrap(~ hetero_relationship, labeller = as_labeller(c("0" = "single", "1" = "in relationship")))
+
+
+ggplot(diary %>% group_by(hetero_relationship, lag_nr_items_day) %>% 
+         summarise(count = n(),
+                   skip = mean(skipped_day, na.rm = T)), aes(lag_nr_items_day, count, fill = skip)) + 
+  geom_bar(stat = 'identity') +
+  scale_color_viridis_c() +
+  facet_wrap(~ hetero_relationship, labeller = as_labeller(c("0" = "single", "1" = "in relationship")))
+
+ggplot(diary, aes(lag_nr_items_day, skipped_day, color = factor(hetero_relationship))) + 
+  geom_pointrange(stat='summary', fun.data='mean_cl_boot', alpha = 0.5) +
+  geom_smooth(method = 'lm') +
+  scale_color_colorblind(guide = F) +
+  facet_wrap(~ hetero_relationship, labeller = as_labeller(c("0" = "single", "1" = "in relationship")))
+
+library(Hmisc)
+ggplot(diary %>% 
+         group_by(hetero_relationship, lag_nr_items_day) %>% 
+         filter(n() > 100), aes(lag_nr_items_day, skipped_day, color = factor(hetero_relationship))) + 
+  geom_pointrange(stat='summary', fun.data='mean_cl_boot', alpha = 0.5) +
+  geom_smooth(method = 'lm') +
+  scale_color_colorblind(guide = F) +
+  facet_wrap(~ hetero_relationship, labeller = as_labeller(c("0" = "single", "1" = "in relationship")))
+
+summary(m1 <- lme4::glmer(skipped_day ~ lag_nr_items_day * hetero_relationship + (1 + lag_nr_items_day | session), diary %>% ungroup() %>% 
+                      mutate(lag_nr_items_day = lag_nr_items_day/10), family = binomial))
+
+library(effects)
+plot(allEffects(m1))
+coef(m1)$session %>% as_tibble(rownames = "session") %>% 
+  left_join(diary %>% select(session, hetero_relationship) %>% distinct(), by = 'session', suffix = c("_est", "")) %>% 
+  arrange(lag_nr_items_day) %>% 
+  mutate(woman = fct_inorder(session)) %>% 
+ggplot(aes(woman, lag_nr_items_day, color = factor(hetero_relationship))) +
+  geom_point() +
+  coord_flip()  +
+  scale_color_colorblind(guide = F) +
+  facet_wrap(~ hetero_relationship, labeller = as_labeller(c("0" = "single", "1" = "in relationship")))
+  
+
+summary(glm(skipped_day ~ lag_nr_items_day, diary %>% ungroup() %>% filter(between(lag_nr_items_day, 10,37)), family = binomial))
+```

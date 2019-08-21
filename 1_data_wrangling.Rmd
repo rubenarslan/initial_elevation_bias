@@ -80,7 +80,8 @@ diary = diary %>%
   filter(!is.na(session), !is.na(created_date)) %>%
   group_by(session) %>% 
   mutate(days_done = max(days_done, na.rm = T), 
-         didntmissfirstweek = all(0:6 %in% day_number),
+         finished_first_page = if_else(!is.na(illness_pain), day_number, NA_real_),
+         didntmissfirstweek = all(0:6 %in% finished_first_page, na.rm = TRUE),
          first_day = if_else(day_number == 0, 1, 0)) %>% 
   ungroup() %>% 
   filter(day_number >= 0, day_number < 70) %>% 
@@ -191,7 +192,7 @@ s3_daily_id <- s3_daily_id %>%
 
 ## merge with diary, throw out dishonest reporting, days outside range etc.
 s3_daily_id = s3_daily_id  %>%
-  inner_join(diary %>% select(session, created_date, day_number, ended_diary), by = c("session", "created_date")) %>% 
+  inner_join(diary %>% select(session, created_date, day_number, ended_diary, weekday, weekend), by = c("session", "created_date")) %>% 
   group_by(session) %>% 
     mutate(didntmissfirstweek = all(0:6 %in% day_number)) %>%   # did they do they whole first week
   ungroup()
@@ -240,6 +241,7 @@ s3_daily_id = s3_daily_id %>%
 )
 ```
 
+
 Focus on questions that were answered to make it easier to compute display order 
 and last item.
 
@@ -272,19 +274,14 @@ s3_daily_id_answered <- s3_daily_id_answered %>%
   mutate(item_mean = mean(answer, na.rm = T),
          item_sd = sd(answer, na.rm = T)) %>% 
   ungroup()
-
-
 s3_daily_nr_items <- s3_daily_id %>% 
   drop_na(created) %>%
   group_by(session, unit_session_id, created_date) %>% 
   summarise(nr_items_day = sum(hidden == 0 & showif %contains% "runif", na.rm = TRUE))
-
 diary <- diary %>% 
   ungroup(session) %>% 
   inner_join(s3_daily_nr_items, by = c("session", "created_date")) 
-
 qplot(diary$nr_items_day)
-
 diary <- diary %>% 
   mutate(skipped_day = if_else(is.na(ended_diary), 1, 0),
          did_not_finish_entry = if_else(is.na(ended_diary) & !is.na(illness_pain), 1, 0),) %>% 
@@ -292,95 +289,46 @@ diary <- diary %>%
   mutate(lag_nr_items_day = lag(nr_items_day))
 ```
 
-
-## Save processed data
-
-Save long-format tables
+## Save data
+Remove unused variables to reduce risk of re-identification
 
 ```{r}
-rio::export(diary, "../routine_and_sex/data/diary_item_data.feather")
-rio::export(s3_daily_id, "../routine_and_sex/data/s3_daily_itemdisplay_processed.feather")
-rio::export(s3_daily_id_answered, "../routine_and_sex/data/s3_daily_id_answered.feather")
-# s3_daily_id <- rio::import("../routine_and_sex/data/s3_daily_itemdisplay_processed.feather")
-```
-
-Save general first page state items
-
-```{r}
-first_page = s3_daily_id_answered  %>% 
-  filter(item_name %in% c("irritable", "self_esteem", "risk_taking", "good_mood", "loneliness", "stressed"))
-
-first_page = first_page %>% 
-  filter(hidden == 0, !is.na(answer)) %>% 
-  group_by(session, unit_session_id) %>% 
-  mutate(display_order = min_rank(display_order),
-         number_of_items_shown = n()) %>%  
-  arrange(session, unit_session_id, display_order) %>% 
-  mutate(
-        last_item = if_na(lag(item_name), "none")) %>% 
-  ungroup() %>% 
-  mutate(last_item = relevel(factor(last_item), ref =  "none"))
-
-rio::export(first_page, "../routine_and_sex/data/first_page.feather")
-```
-
-Save time use items
+s3_daily_id_answered <- s3_daily_id_answered %>% 
+  select(session, didntmissfirstweek, # person level
+         unit_session_id, day_number, weekday, weekend, ended_diary, refer_time_period, day_number_factor,   # day level
+         item_name, label, label_english, item_mean, item_sd, item_type,  # item level
+         answer, display_order, hidden, # person x day x item response level
+         first_day_of_item, first_day_of_item_factor, first_day_of_item_shown, showif, 
+         times_item_answered, times_item_answered_factor, 
+         number_of_items_shown, last_answer, response_time_since_previous) %>% 
+    filter(item_name %in% c("irritable", "self_esteem", "risk_taking", "good_mood", "loneliness", "stressed",
+                           "in_pair_desire_7", "in_pair_desire_8", "in_pair_desire_10", "in_pair_desire_11", "in_pair_desire_13", "in_pair_desire_14"),
+         item_name %contains% "mate_retention", item_name %starts_with% "time_")
 
 
-```{r}
-time_items = s3_daily_id_answered  %>% 
-  filter(item_name %starts_with% "time_") %>% 
-  filter(hidden == 0, !is.na(answer)) %>% 
-  group_by(session, unit_session_id) %>% 
-  mutate(display_order = min_rank(display_order),
-         number_of_items_shown = n()) %>%  
-  arrange(session, unit_session_id, display_order) %>% 
-  mutate(
-        last_item = if_na(lag(item_name), "none")) %>% 
-  ungroup() %>% 
-  mutate(last_item = relevel(factor(last_item), ref =  "none"))
+key <- keyring::key_get_raw("encrypt_data_routinely_randomise")
+class(key) <- c("aes", "raw")
+library(cyphr)
+key <- cyphr::key_openssl(key)
+encrypt(saveRDS(s3_daily_id_answered, "s3_daily_id_answered.rds"), key)
+encrypt(write.csv(s3_daily_id_answered, "s3_daily_id_answered.csv"), key)
 
-rio::export(time_items, "../routine_and_sex/data/time_items.feather")
-```
+stopifnot(!is.null(var_label(diary$relationship_status))) # keep labels
 
-Save intra-pair desire items
-
-```{r}
-ip_desire_items <- c("in_pair_desire_7", "in_pair_desire_8",
-                     "in_pair_desire_10", "in_pair_desire_11",
-                     "in_pair_desire_13", "in_pair_desire_14")
-desire_items = s3_daily_id_answered  %>% 
-  filter(item_name %in% ip_desire_items) %>% 
-  filter(hidden == 0, !is.na(answer)) %>% 
-  group_by(session, unit_session_id) %>% 
-  mutate(display_order = min_rank(display_order),
-         number_of_items_shown = n()) %>%  
-  arrange(session, unit_session_id, display_order) %>% 
-  mutate(
-        last_item = if_na(lag(item_name), "none")) %>% 
-  ungroup() %>% 
-  mutate(last_item = relevel(factor(last_item), ref =  "none"))
-
-rio::export(desire_items, "../routine_and_sex/data/desire_items.feather")
-```
-
-Save mate retention items
-
-```{r}
-retention_items = s3_daily_id_answered  %>% 
-  filter(item_name %contains% "mate_retention") %>% 
-  filter(hidden == 0, !is.na(answer)) %>% 
-  group_by(session, unit_session_id) %>% 
-  mutate(display_order = min_rank(display_order),
-         number_of_items_shown = n()) %>%  
-  arrange(session, unit_session_id, display_order) %>% 
-  mutate(
-        last_item = if_na(lag(item_name), "none")) %>% 
-  ungroup() %>% 
-  mutate(last_item = relevel(factor(last_item), ref =  "none"))
-
-rio::export(retention_items, "../routine_and_sex/data/retention_items.feather")
+diary <- diary %>% select(session, didntmissfirstweek, hetero_relationship,
+                          age, education_years, has_children, nr_children, relationship_status,
+                          occupational_status,
+                          day_number, did_not_finish_entry, skipped_day,
+                          nr_items_day_done, lag_nr_items_day)
+encrypt(saveRDS(diary, "diary.rds"), key)
+encrypt(write.csv(diary, "diary.csv"), key)
 ```
 
 
+## How key was set
+
+```r
+keyring::key_set("encrypt_data_routinely_randomise")
+# entered key (precisely 16/24/32 characters long)
+```
 
