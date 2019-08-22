@@ -977,14 +977,11 @@ desire_items %>%
 ```
 
 
-```{r fig.cap="Estimates for biases and covariates for the desire items.",fig.width=15,fig.height=10}
+```{r fig.cap="Estimates for biases and covariates for the desire items.",fig.width=18,fig.height=10}
 predictors <- desire_items %>% 
-  mutate(item_order = factor(display_order),
-         times_item_shown = times_item_answered_factor,
-         items_shown = factor(number_of_items_shown),
-         last_item = relevel(factor(last_item), "none"),
-         dnr = day_number,
-         day_number = day_number_factor
+  mutate(item_order = display_order,
+         times_item_shown = times_item_answered,
+         items_shown = number_of_items_shown
          )
 
 complex_mods <-  predictors %>% 
@@ -1110,15 +1107,10 @@ retention_items %>%
 
 ```{r fig.cap="Estimates for biases and covariates for the mate retention items.",fig.width=15,fig.height=10}
 predictors <- retention_items %>% 
-  mutate(
-    item_order = factor(display_order),
-    times_item_shown = times_item_answered_factor,
-    items_shown = factor(number_of_items_shown),
-    last_item = relevel(factor(last_item), "none"),
-    dnr = day_number,
-    day_number = day_number_factor
-  )
-
+  mutate(item_order = display_order,
+         times_item_shown = times_item_answered,
+         items_shown = number_of_items_shown
+         )
 complex_mods <-  predictors %>% 
   split(.$item_name) %>%
   map(~ lmer(answer ~ weekday + items_shown + item_order + first_day_of_item_shown + day_number_factor + refer_time_period +  (1 | session), data = .))
