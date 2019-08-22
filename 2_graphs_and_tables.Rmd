@@ -297,7 +297,7 @@ library(broom.mixed)
 
 complex_mods <-  predictors %>% 
   split(.$item_name) %>%
-  map(~ lmer(answer ~ weekday + items_shown + item_order + first_day_of_item_shown + poly(scale(day_number, scale=F)/10, degree = 3, raw = T) + refer_time_period +  (1 | session), data = .))
+  map(~ lmer(answer ~ weekday + items_shown + item_order + first_day_of_item_shown + day_number_factor + refer_time_period +  (1 | session), data = .))
 
 all_biases <- complex_mods %>% 
   map(~ tidy(., conf.int = TRUE, conf.level = 0.95)) %>% 
@@ -365,7 +365,7 @@ library(lmerTest)
 
 complex_mods_rt <-  predictors_rt %>% 
   split(.$item_name) %>%
-  map(~ lmer(response_time_since_previous/1000 ~ weekday + items_shown + item_order + first_day_of_item_shown + poly(scale(day_number, scale=F)/10, degree = 3, raw = T) + refer_time_period +  (1 | session), data = .))
+  map(~ lmer(response_time_since_previous/1000 ~ weekday + items_shown + item_order + first_day_of_item_shown + day_number_factor + refer_time_period +  (1 | session), data = .))
 # summary(lmer(response_time_since_previous/1000 ~ items_shown + item_order + times_item_shown + poly(scale(day_number, scale=F)/10, degree = 3, raw = T) + refer_time_period +  (1 | session), data = predictors %>% filter(item_name == 'good_mood')))
 # qplot(predictors$response_time_since_previous/1000)
 
