@@ -72,6 +72,12 @@
       "Source": "CRAN",
       "Hash": "7c75d8df40b04f6ae82828abc41f097c"
     },
+    "Formula": {
+      "Package": "Formula",
+      "Version": "1.2-3",
+      "Source": "CRAN",
+      "Hash": "22b5f7fb25c1ff7fbdb955448e15ef56"
+    },
     "GGally": {
       "Package": "GGally",
       "Version": "1.4.0",
@@ -83,6 +89,12 @@
       "Version": "2014.11-1",
       "Source": "CRAN",
       "Hash": "76721610c9e21fa56db1dd61593c7ea3"
+    },
+    "Hmisc": {
+      "Package": "Hmisc",
+      "Version": "4.2-0",
+      "Source": "CRAN",
+      "Hash": "404b844f38debdf4cee2b7d1bf6f9b48"
     },
     "MASS": {
       "Package": "MASS",
@@ -190,6 +202,12 @@
       "Source": "CRAN",
       "Hash": "6b3d0500b241722a115a72c3fb577de8"
     },
+    "acepack": {
+      "Package": "acepack",
+      "Version": "1.4.1",
+      "Source": "CRAN",
+      "Hash": "112237ebbcb6648c712bed44392806dc"
+    },
     "arm": {
       "Package": "arm",
       "Version": "1.10-1",
@@ -282,6 +300,12 @@
       "Source": "CRAN",
       "Hash": "a6279d19fb8783f899f8dc3edb9a71b0"
     },
+    "checkmate": {
+      "Package": "checkmate",
+      "Version": "1.9.4",
+      "Source": "CRAN",
+      "Hash": "ebfc0e2fd0d57f270822015836600aef"
+    },
     "cli": {
       "Package": "cli",
       "Version": "1.1.0",
@@ -359,6 +383,18 @@
       "RemoteRepos": "https://cran.rstudio.com",
       "RemoteSha": "4.0",
       "Hash": "e73352ac820b038acad6e594946c62bf"
+    },
+    "cyphr": {
+      "Package": "cyphr",
+      "Version": "1.0.1",
+      "Source": "GitHub",
+      "RemoteType": "github",
+      "RemoteHost": "api.github.com",
+      "RemoteRepo": "cyphr",
+      "RemoteUsername": "ropensci",
+      "RemoteRef": "master",
+      "RemoteSha": "60b6e5effdfc369f52bf0885ba9daec0828ce21d",
+      "Hash": "7cdaf961d60aa9663a56ffab84aafea1"
     },
     "data.table": {
       "Package": "data.table",
@@ -496,6 +532,12 @@
       "Source": "CRAN",
       "Hash": "c2a574a14f5f45a84ead80391c3075d6"
     },
+    "getPass": {
+      "Package": "getPass",
+      "Version": "0.2-2",
+      "Source": "CRAN",
+      "Hash": "d63ef1c040f780c4148b4771fc243bef"
+    },
     "ggplot2": {
       "Package": "ggplot2",
       "Version": "3.2.1",
@@ -581,6 +623,12 @@
       "Version": "0.5.0",
       "Source": "CRAN",
       "Hash": "7e3ebd24ef142be235176ce3ee954515"
+    },
+    "htmlTable": {
+      "Package": "htmlTable",
+      "Version": "1.13.1",
+      "Source": "CRAN",
+      "Hash": "5f09ce2f060b197751f692209c753e33"
     },
     "htmltools": {
       "Package": "htmltools",
@@ -681,6 +729,12 @@
       "Version": "0.20-38",
       "Source": "CRAN",
       "Hash": "16dfe2407fe485b6a9fb098120008721"
+    },
+    "latticeExtra": {
+      "Package": "latticeExtra",
+      "Version": "0.6-28",
+      "Source": "CRAN",
+      "Hash": "55419a3c434e22dd282f7ec799d345bd"
     },
     "lavaan": {
       "Package": "lavaan",
@@ -1098,6 +1152,12 @@
       "Source": "CRAN",
       "Hash": "595f1d29e96ead39e64aba4275f18fed"
     },
+    "rpart": {
+      "Package": "rpart",
+      "Version": "4.1-15",
+      "Source": "CRAN",
+      "Hash": "9f5914116daacdd8aeb4ef2e9f36e619"
+    },
     "rpf": {
       "Package": "rpf",
       "Version": "0.62",
@@ -1167,6 +1227,12 @@
       "Version": "1.0.7",
       "Source": "CRAN",
       "Hash": "6034e47175d4eccbca1f3aa8b803d3fb"
+    },
+    "sodium": {
+      "Package": "sodium",
+      "Version": "1.1",
+      "Source": "CRAN",
+      "Hash": "1c1b4c25bbe2ab44c6ba00a19e1207b2"
     },
     "sourcetools": {
       "Package": "sourcetools",
