@@ -127,9 +127,11 @@ first_page %>%
 
 ```{r}
 skimr::skim_with(haven_labelled = skimr::get_skimmers()$numeric)
-all_surveys <- diary %>% ungroup() %>% select(session, didntmissfirstweek, hetero_relationship,
+all_surveys <- diary %>% ungroup() %>% 
+  select(session, didntmissfirstweek, hetero_relationship,
                           age, education_years, has_children, nr_children, relationship_status,
-                          occupational_status)
+                          occupational_status) %>% 
+  distinct()
 
 first_page %>% group_by(session, unit_session_id) %>% 
   summarise(answered = any(!is.na(answer))) %>% 
@@ -161,12 +163,15 @@ first_page %>%
   ungroup() %>% 
   select(-item_name) %>% 
   rowSums()
+  
+diary %>% filter(did_not_finish_entry == 0) %>% nrow()
 ```
 
 
 # Bias tests
 
-## Figure 1
+## Figure 1: Reaction times 
+
 We showed above that responses do not drift much over time in the diary. But do
 participants learn to respond more quickly?
 

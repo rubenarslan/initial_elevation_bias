@@ -15,16 +15,6 @@ output:
 ---
 
 
-todo:
-- make figures and tables for multilevel model (take code from 2_)
-- frame other models as robustness checks
-  - complete first week
-  - don't adjust for confounders?
-  - random effects?
-  - nonlinear effects?
-- make nice tables
-- write up dropout section here and in ms
-
 ```{r echo=F}
 knitr::opts_chunk$set(
   warning = F, message = F, 
@@ -32,7 +22,6 @@ knitr::opts_chunk$set(
   fig.width = 15, fig.height = 6
   )
 ```
-
 
 ```{r}
 options(stringsAsFactors = FALSE)
@@ -81,15 +70,30 @@ theme_set(theme_classic() + theme_pander(base_size = 18))
 
 
 show_dt <- . %>% 
-  mutate(term = fct_relevel(fct_recode(str_replace(str_replace(term, "weekday", ""), "day_number_factor", "Day "), 
+  mutate(term = fct_relevel(fct_recode(
+    str_replace(
+    str_replace(
+    str_replace(
+    str_replace(
+    str_replace(
+    str_replace(
+      str_replace(str_replace(term, "weekday", ""), "day_number_factor", "Day "),
+      "__", " "), 
+      "\\.", " "), 
+       "times_item_shown", "No. times item shown"),
+       "items_shown", "No. items shown"),
+       "item_order", "Item order"),
+       "first_day_of_item_shownTRUE", "Initial display"),
                            "No. times item shown" = "times_item_shown",
                            "Ref: since last entry" = "refer_time_periodlast entry",
                            "No. items shown" = "items_shown",
                            "Item order" = "item_order",
+                           "Intercept" = "(Intercept)",
                            "Initial display" = "first_day_of_item_shownTRUE",
                            "Day" = "poly(scale(day_number, scale = F)/10, degree = 3, raw = T)1",
                            "Day^2" = "poly(scale(day_number, scale = F)/10, degree = 3, raw = T)2",
                            "Day^3" = "poly(scale(day_number, scale = F)/10, degree = 3, raw = T)3"),
+                           "Intercept",
                            "Initial display" ,
                            "No. items shown", 
                            "No. times item shown", 
@@ -103,7 +107,7 @@ show_dt <- . %>%
   mutate_at(vars(estimate, std.error, statistic, conf.low, conf.high), ~ sprintf("%.2f", .)) %>% 
   mutate_at(vars(df), ~ sprintf("%.0f", .)) %>% 
   mutate_at(vars(p.value), ~ sprintf("%.3f", .)) %>% 
-  mutate(estimate = if_else(is.na(conf.low), estimate, str_c(estimate, "\n[",conf.low, ";", conf.high, "]"))) %>% 
+  mutate(estimate = if_else(conf.low == "NA", estimate, str_c(estimate, "\n[",conf.low, ";", conf.high, "]"))) %>% 
   select(response, term, estimate) %>% 
   spread(response, estimate)
 ```
@@ -199,7 +203,7 @@ first_page %>%
 ```
 
 
-```{r fig.cap="An alternative, more focused visualisation of initial elevation bias. Are responses elevated when shown for the first time, even if it is not the first day of the diary? The dashed line shows the overall mean for the item. Standard errors cannot be seen, because they are so narrow (and ignore the multilevel structure of the data."}
+```{r fig.cap="An alternative, more focused visualisation of initial elevation bias. Are responses elevated when shown for the first time, even if it is not the first day of the diary? The dashed line shows the overall mean for the item. Standard errors cannot be seen, because they are so narrow (and ignore the multilevel structure of the data)"}
 first_page %>% 
   group_by(item_name) %>% 
   mutate(group_mean = mean(answer, na.rm = TRUE),
@@ -334,12 +338,13 @@ first_page %>%
 ```
 
 
-```{r  fig.cap="Again, we can also examine the response time to each item according to number of items shown."}
-first_page %>% filter(response_time_since_previous < 1*30*1000, response_time_since_previous > 0, display_order > 1) %>% 
+```{r  fig.cap="Again, we can also examine the response time to each item according to number of items shown. The line shows the 10% trimmed means, the points show means plus standard errors. We excluded responses that were made out of order (negative response times relative to the previous item), and responses that took longer than 30 seconds."}
+first_page %>% filter(response_time_since_previous < 1*30*1000, response_time_since_previous > 0) %>% 
   ggplot(., aes(number_of_items_shown, response_time_since_previous/1000)) + 
   geom_pointrange(alpha = 0.3, position = position_dodge(width = 0.2), stat ='summary', fun.data = 'mean_se') + 
   geom_line(position = position_dodge(width = 0.4), stat ='summary', fun.y = function(x) { mean(x, na.rm =T, trim = 0.1) }) +
   scale_y_continuous("Response time (in s) since previous item") +
+  scale_x_continuous("No. of items shown", breaks = 1:6) +
   facet_wrap(~ label_english, scales = 'free_y')
 ```
 
@@ -358,7 +363,7 @@ first_page %>%
 ```
 
 
-```{r fig.cap="As above, we can not only examine the mean but also the relative frequencies of  each response."}
+```{r fig.cap="As above, we can not only examine the mean but also the distribution of each response."}
 first_page %>% 
   group_by(label_english, item_name, last_item) %>% 
   mutate(group_n = n_nonmissing(answer)) %>% 
@@ -446,7 +451,7 @@ predictors %>%
   footnote("Correlation between the residuals of a covariate-only model and a model additionally including the randomised variables.", threeparttable = TRUE) %>% 
   kable_styling(latex_options = "hold_position") %>% 
   column_spec(1, width = "3cm") %>% 
-  column_spec(2:7, width = "1.5cm")
+  column_spec(2, width = "1.5cm")
 ```
 
 
@@ -454,8 +459,11 @@ predictors %>%
 all_biases %>% show_dt() %>% 
    knitr::kable(caption = "Multilevel regression coefficients", format = "latex", booktabs = TRUE, longtable = TRUE) %>%
   footnote("Estimates from the multilevel regression model displayed in Figure 5, with 95% confidence intervals.", threeparttable = TRUE) %>% 
-  kable_styling(latex_options = "hold_position")
+  kable_styling(latex_options = "hold_position") %>% 
+  column_spec(1, width = "2.5cm") %>% 
+  column_spec(2:7, width = "1.7cm")
 ```
+
 ## Robustness checks
 Here, we examine several alternative model specifications to see whether the results are robust to additional constraints or relaxed assumptions.
 
@@ -528,9 +536,11 @@ predictors %>%
   gather(`Response variable`, Correlation) %>% 
   mutate(Correlation = sprintf("%.2f", Correlation)) %>% 
   arrange(Correlation) %>% 
-  knitr::kable(caption = "Residual correlation") %>% 
-  footnote("Correlation between the residuals of a covariate-only model and a model additionally including the randomised variables.") %>% 
-  kable_styling(latex_options = "hold_position")
+  knitr::kable(caption = "Residual correlation", format = "latex",  booktabs = TRUE) %>% 
+  footnote("Correlation between the residuals of a covariate-only model and a model additionally including the randomised variables.", threeparttable = TRUE) %>% 
+  kable_styling(latex_options = "hold_position") %>% 
+  column_spec(1, width = "3cm") %>% 
+  column_spec(2, width = "1.5cm")
 ```
 
 ### Last item identity
@@ -615,7 +625,10 @@ predictors %>%
     lmer(answer ~ last_item + items_shown + item_order + times_item_shown + day_number + refer_time_period +  (1 | session), data = .), REML = FALSE)
     )) %>% 
   bind_rows(.id = "response") %>% 
-  knitr::kable()
+  select(item_name, term, df, AIC, logLik, statistic, Chi.Df, p.value) %>% 
+  knitr::kable(caption = "Model comparison", format = "latex", booktabs = TRUE, longtable = TRUE) %>%
+  footnote("Do models additionally accounting for last item identity fit better?", threeparttable = TRUE) %>% 
+  kable_styling(latex_options = "hold_position")
 ```
 
 
@@ -682,21 +695,27 @@ all_biases %>%
 ```{r}
 predictors %>% 
   split(.$label_english) %>%
-  map(~ cor(residuals(lmer(answer ~ weekday + day_number_factor + refer_time_period + (1 | session), .)), residuals(lmer(answer ~ weekday + items_shown + item_order + first_day_of_item_shown + day_number_factor + refer_time_period + (1 + items_shown + item_order + first_day_of_item_shown | session), data = .)))^2) %>% 
+  map(~ cor(residuals(lmer(answer ~ weekday + day_number_factor + refer_time_period + (1 | session), .)), residuals(lmer(answer ~ weekday + items_shown + item_order + first_day_of_item_shown + day_number_factor + refer_time_period + (1 | session), data = .)))^2) %>% 
   bind_rows() %>% 
   gather(`Response variable`, Correlation) %>% 
   mutate(Correlation = sprintf("%.2f", Correlation)) %>% 
   arrange(Correlation) %>% 
-  knitr::kable(caption = "Residual correlation") %>% 
-  footnote("Correlation between the residuals of a covariate-only model and a model additionally including the randomised variables.") %>% 
-  kable_styling(latex_options = "hold_position")
+  knitr::kable(caption = "Residual correlation", format = "latex",  booktabs = TRUE) %>% 
+  footnote("Correlation between the residuals of a covariate-only model and a model additionally including the randomised variables.", threeparttable = TRUE) %>% 
+  kable_styling(latex_options = "hold_position") %>% 
+  column_spec(1, width = "3cm") %>% 
+  column_spec(2, width = "1.5cm")
 ```
+
+\pagebreak
 
 ```{r}
 all_biases %>% show_dt() %>% 
-   knitr::kable(format = "latex", booktabs = TRUE, caption = "Multilevel regression coefficients") %>%
-  footnote("Estimates from the multilevel regression model with varying slopes, with 95% confidence intervals.", threeparttable = TRUE) %>% 
-  kable_styling(latex_options = "hold_position")
+   knitr::kable(caption = "Multilevel regression coefficients", format = "latex", booktabs = TRUE, longtable = TRUE) %>%
+  footnote("Estimates from the multilevel regression model with varying slopes. With 95% confidence intervals.", threeparttable = TRUE) %>% 
+  kable_styling(latex_options = "hold_position") %>% 
+  column_spec(1, width = "2.5cm") %>% 
+  column_spec(2:7, width = "1.7cm")
 ```
 
 ### Nonlinear effects
@@ -767,9 +786,11 @@ predictors %>%
   gather(`Response variable`, Correlation) %>% 
   mutate(Correlation = sprintf("%.2f", Correlation)) %>% 
   arrange(Correlation) %>% 
-  knitr::kable(caption = "Residual correlation") %>% 
-  footnote("Correlation between the residuals of a covariate-only model and a model additionally including the randomised variables.") %>% 
-  kable_styling(latex_options = "hold_position")
+  knitr::kable(caption = "Residual correlation", format = "latex",  booktabs = TRUE) %>% 
+  footnote("Correlation between the residuals of a covariate-only model and a model additionally including the randomised variables.", threeparttable = TRUE) %>% 
+  kable_styling(latex_options = "hold_position") %>% 
+  column_spec(1, width = "3cm") %>% 
+  column_spec(2, width = "1.5cm")
 ```
 
 
@@ -803,7 +824,8 @@ On  a "less than usual" to "more than usual" response scale.
 time_items %>% group_by(item_name, label_english) %>% 
   summarise(women = n_distinct(session),
             days = n_distinct(unit_session_id)) %>% 
-  knitr::kable(caption = "How often did how many women see each item?")
+  knitr::kable(format = "latex", caption = "How often did how many women see each item?") %>% 
+  kable_styling(latex_options = "hold_position")
 ```
 
 ```{r}
@@ -846,7 +868,7 @@ all_biases %>%
   filter(is.na(group)) %>% 
   filter(term != "(Intercept)") %>% 
   left_join(
-    first_page %>% select(response = item_name, item = label_english, item_mean, item_sd) %>% distinct()
+    time_items %>% select(response = item_name, item = label_english, item_mean, item_sd) %>% distinct()
   ) %>% 
   mutate(term = fct_relevel(fct_recode(str_replace(str_replace(term, "weekday", ""), "day_number_factor", "Day "), 
                            "No. times item shown" = "times_item_shown",
@@ -891,7 +913,20 @@ predictors %>%
   arrange(Correlation) %>% 
   knitr::kable(caption = "Residual correlation", format = "latex",  booktabs = TRUE) %>% 
   footnote("Correlation between the residuals of a covariate-only model and a model additionally including the randomised variables.", threeparttable = TRUE) %>% 
-  kable_styling(latex_options = "hold_position")
+  kable_styling(latex_options = "hold_position") %>% 
+  column_spec(1, width = "3cm") %>% 
+  column_spec(2, width = "1.5cm")
+```
+
+\pagebreak
+
+```{r}
+all_biases %>% show_dt() %>% 
+   knitr::kable(caption = "Multilevel regression coefficients", format = "latex", booktabs = TRUE, longtable = TRUE) %>%
+  footnote("Estimates from the multilevel regression model displayed in Figure 5, with 95% confidence intervals.", threeparttable = TRUE) %>% 
+  kable_styling(latex_options = "hold_position") %>% 
+  column_spec(1, width = "2.5cm") %>% 
+  column_spec(2:7, width = "1.7cm")
 ```
 
 ## Desire items
@@ -915,6 +950,15 @@ desire_items = s3_daily_id_answered  %>%
 On a "very inaccurate" to "very accurate" response scale.
 
 ```{r}
+desire_items %>% group_by(label_english) %>% 
+  summarise(women = n_distinct(session),
+            days = n_distinct(unit_session_id)) %>% 
+  knitr::kable(format = "latex", caption = "How often did how many women see each item?") %>% 
+  kable_styling(latex_options = "hold_position")
+```
+
+
+```{r}
 desire_items %>% 
   filter(day_number < 7) %>% 
   group_by(item_name) %>% 
@@ -932,15 +976,8 @@ desire_items %>%
   scale_x_continuous("Day number", breaks = 0:10)
 ```
 
-```{r}
-desire_items %>% group_by(label_english) %>% 
-  summarise(women = n_distinct(session),
-            days = n_distinct(unit_session_id)) %>% 
-  knitr::kable()
-```
 
-
-```{r fig.width=10,fig.height=8}
+```{r fig.cap="Estimates for biases and covariates for the desire items.",fig.width=15,fig.height=10}
 predictors <- desire_items %>% 
   mutate(item_order = factor(display_order),
          times_item_shown = times_item_answered_factor,
@@ -961,26 +998,68 @@ all_biases <- complex_mods %>%
 
 
 all_biases %>% 
-  filter(term != "refer_time_periodlast entry", 
-         str_sub(term, 1, 10) != "day_number", term != "(Intercept)", !is.na(conf.high)) %>% 
+  filter(is.na(group)) %>% 
+  filter(term != "(Intercept)") %>% 
+  left_join(
+    desire_items %>% select(response = item_name, item = label_english, item_mean, item_sd) %>% distinct()
+  ) %>% 
+  mutate(term = fct_relevel(fct_recode(str_replace(str_replace(term, "weekday", ""), "day_number_factor", "Day "), 
+                           "No. times item shown" = "times_item_shown",
+                           "Ref: since last entry" = "refer_time_periodlast entry",
+                           "No. items shown" = "items_shown",
+                           "Item order" = "item_order",
+                           "Initial display" = "first_day_of_item_shownTRUE",
+                           "Day" = "poly(scale(day_number, scale = F)/10, degree = 3, raw = T)1",
+                           "Day^2" = "poly(scale(day_number, scale = F)/10, degree = 3, raw = T)2",
+                           "Day^3" = "poly(scale(day_number, scale = F)/10, degree = 3, raw = T)3"),
+                           "Initial display" ,
+                           "No. items shown", 
+                           "No. times item shown", 
+                           "Item order",
+                           "Ref: since last entry",
+                           "Sunday","Saturday",  "Friday", "Thursday","Wednesday",  "Tuesday", 
+                           "Day^3",
+                           "Day^2",
+                           "Day")
+                           ) %>% 
+  # filter(term != "refer_time_periodlast entry", 
+         # str_sub(term, 1, 10) != "day_number", term != "(Intercept)", !is.na(conf.high)) %>% 
   ggplot(aes(x = term, y = estimate, ymin = conf.low, ymax = conf.high)) +
+  geom_rect(ymin = -0.1, ymax = 0.1, xmin = -Inf, xmax = Inf, fill = "lightblue", alpha = 0.5) +
+  # geom_blank(aes(y = estimate, ymin = estimate - item_sd, ymax = estimate + item_sd)) +
   geom_hline(yintercept = 0, linetype = 'dashed') +
-  facet_wrap(~ response) +
-  geom_linerange() +
-  scale_y_continuous("95% CIs for regression coefficients") +
+  ggrepel::geom_text_repel(aes(label = sprintf("%.2f",estimate)), force = 0, nudge_x = 0.2, segment.size = 0) +
+  facet_wrap(~ item) +
+  geom_pointrange() +
+  scale_y_continuous("Estimated effect on response (95% CI)") +
+  scale_x_discrete("Predictor") +
   coord_flip()
 ```
 
-How much do our variables change when we residualise for all of these biases?
-
-```{R}
+```{r}
 predictors %>% 
-  split(.$item_name) %>%
-  map(~ cor(.$answer, residuals(lm(answer ~ items_shown + last_item + times_item_shown + day_number + refer_time_period, data = .)))) %>% 
+  split(.$label_english) %>%
+  map(~ cor(residuals(lmer(answer ~ weekday + day_number_factor + refer_time_period + (1 | session), .)), residuals(lmer(answer ~ weekday + items_shown + item_order + first_day_of_item_shown + day_number_factor + refer_time_period + (1 | session), data = .)))^2) %>% 
   bind_rows() %>% 
-  gather(item, cor) %>% 
-  arrange(cor) %>% 
-  knitr::kable()
+  gather(`Response variable`, Correlation) %>% 
+  mutate(Correlation = sprintf("%.2f", Correlation)) %>% 
+  arrange(Correlation) %>% 
+  knitr::kable(caption = "Residual correlation", format = "latex",  booktabs = TRUE) %>% 
+  footnote("Correlation between the residuals of a covariate-only model and a model additionally including the randomised variables.", threeparttable = TRUE) %>% 
+  kable_styling(latex_options = "hold_position") %>% 
+  column_spec(1, width = "3cm") %>% 
+  column_spec(2, width = "1.5cm")
+```
+
+\pagebreak
+
+```{r}
+all_biases %>% show_dt() %>% 
+   knitr::kable(caption = "Multilevel regression coefficients", format = "latex", booktabs = TRUE, longtable = TRUE) %>%
+  footnote("Estimates from the multilevel regression model displayed in Figure 5, with 95% confidence intervals.", threeparttable = TRUE) %>% 
+  kable_styling(latex_options = "hold_position") %>% 
+  column_spec(1, width = "2.5cm") %>% 
+  column_spec(2:7, width = "1.7cm")
 ```
 
 ## Retention items
@@ -1001,6 +1080,16 @@ On a "not at all" to "very much" response scale.
 
 ```{r}
 retention_items %>% 
+  group_by(item_name, label_english) %>% 
+  summarise(women = n_distinct(session),
+            days = n_distinct(unit_session_id)) %>% 
+  knitr::kable(format = "latex", caption = "How often did how many women see each item?") %>% 
+  kable_styling(latex_options = "hold_position")
+```
+
+
+```{r}
+retention_items %>% 
   filter(day_number < 7) %>% 
   group_by(item_name) %>% 
   mutate(group_mean = mean(answer, na.rm = TRUE)) %>% 
@@ -1017,18 +1106,9 @@ retention_items %>%
   scale_x_continuous("Day number", breaks = 0:10)
 ```
 
-```{r}
-retention_items %>% 
-  group_by(item_name, label_english) %>% 
-  summarise(women = n_distinct(session),
-            days = n_distinct(unit_session_id)) %>% 
-  knitr::kable()
-```
 
 
-
-
-```{r fig.width=10,fig.height=8}
+```{r fig.cap="Estimates for biases and covariates for the mate retention items.",fig.width=15,fig.height=10}
 predictors <- retention_items %>% 
   mutate(
     item_order = factor(display_order),
@@ -1048,28 +1128,69 @@ all_biases <- complex_mods %>%
   map(~ tidy(., conf.int = TRUE, conf.level = 0.99)) %>% 
   bind_rows(.id = "response")
 
-
 all_biases %>% 
-  filter(term != "refer_time_periodlast entry", 
-         str_sub(term, 1, 10) != "day_number", term != "(Intercept)", !is.na(conf.high)) %>% 
+  filter(is.na(group)) %>% 
+  filter(term != "(Intercept)") %>% 
+  left_join(
+    retention_items %>% select(response = item_name, item = label_english, item_mean, item_sd) %>% distinct()
+  ) %>% 
+  mutate(term = fct_relevel(fct_recode(str_replace(str_replace(term, "weekday", ""), "day_number_factor", "Day "), 
+                           "No. times item shown" = "times_item_shown",
+                           "Ref: since last entry" = "refer_time_periodlast entry",
+                           "No. items shown" = "items_shown",
+                           "Item order" = "item_order",
+                           "Initial display" = "first_day_of_item_shownTRUE",
+                           "Day" = "poly(scale(day_number, scale = F)/10, degree = 3, raw = T)1",
+                           "Day^2" = "poly(scale(day_number, scale = F)/10, degree = 3, raw = T)2",
+                           "Day^3" = "poly(scale(day_number, scale = F)/10, degree = 3, raw = T)3"),
+                           "Initial display" ,
+                           "No. items shown", 
+                           "No. times item shown", 
+                           "Item order",
+                           "Ref: since last entry",
+                           "Sunday","Saturday",  "Friday", "Thursday","Wednesday",  "Tuesday", 
+                           "Day^3",
+                           "Day^2",
+                           "Day")
+                           ) %>% 
+  # filter(term != "refer_time_periodlast entry", 
+         # str_sub(term, 1, 10) != "day_number", term != "(Intercept)", !is.na(conf.high)) %>% 
   ggplot(aes(x = term, y = estimate, ymin = conf.low, ymax = conf.high)) +
+  geom_rect(ymin = -0.1, ymax = 0.1, xmin = -Inf, xmax = Inf, fill = "lightblue", alpha = 0.5) +
+  # geom_blank(aes(y = estimate, ymin = estimate - item_sd, ymax = estimate + item_sd)) +
   geom_hline(yintercept = 0, linetype = 'dashed') +
-  facet_wrap(~ response) +
-  scale_y_continuous("95% CIs for regression coefficients") +
-  geom_linerange() +
+  ggrepel::geom_text_repel(aes(label = sprintf("%.2f",estimate)), force = 0, nudge_x = 0.2, segment.size = 0) +
+  facet_wrap(~ item) +
+  geom_pointrange() +
+  scale_y_continuous("Estimated effect on response (95% CI)") +
+  scale_x_discrete("Predictor") +
   coord_flip()
 ```
 
-How much do our variables change when we residualise for all of these biases?
-
-```{R}
+```{r}
 predictors %>% 
-  split(.$item_name) %>%
-  map(~ cor(.$answer, residuals(lm(answer ~ items_shown + last_item + times_item_shown + day_number + refer_time_period, data = .)))) %>% 
+  split(.$label_english) %>%
+  map(~ cor(residuals(lmer(answer ~ weekday + day_number_factor + refer_time_period + (1 | session), .)), residuals(lmer(answer ~ weekday + items_shown + item_order + first_day_of_item_shown + day_number_factor + refer_time_period + (1 | session), data = .)))^2) %>% 
   bind_rows() %>% 
-  gather(item, cor) %>% 
-  arrange(cor) %>% 
-  knitr::kable()
+  gather(`Response variable`, Correlation) %>% 
+  mutate(Correlation = sprintf("%.2f", Correlation)) %>% 
+  arrange(Correlation) %>% 
+  knitr::kable(caption = "Residual correlation", format = "latex",  booktabs = TRUE) %>% 
+  footnote("Correlation between the residuals of a covariate-only model and a model additionally including the randomised variables.", threeparttable = TRUE) %>% 
+  kable_styling(latex_options = "hold_position") %>% 
+  column_spec(1, width = "3cm") %>% 
+  column_spec(2, width = "1.5cm")
+```
+
+\pagebreak
+
+```{r}
+all_biases %>% show_dt() %>% 
+   knitr::kable(caption = "Multilevel regression coefficients", format = "latex", booktabs = TRUE, longtable = TRUE) %>%
+  footnote("Estimates from the multilevel regression model displayed in Figure 5, with 95% confidence intervals.", threeparttable = TRUE) %>% 
+  kable_styling(latex_options = "hold_position") %>% 
+  column_spec(1, width = "2.5cm") %>% 
+  column_spec(2:7, width = "1.7cm")
 ```
 
 
@@ -1081,52 +1202,37 @@ to answer slightly more questions, some of which were also randomised in appeara
 We can use this variable to predict whether a woman who had to answer more questions
 is less likely to answer the diary on the next day.
 
-```{r}
-crosstabs(~ did_not_finish_entry + skipped_day, diary)
-
+```{r fig.cap="Distribution of the number of randomised items assigned on each day, split by relationship status."}
 ggplot(diary, aes(nr_items_day_done, fill = factor(hetero_relationship))) + 
   geom_bar() +
   scale_fill_colorblind(guide = FALSE) +
-  facet_wrap(~ hetero_relationship, labeller = as_labeller(c("0" = "single", "1" = "in relationship")))
-
-
-ggplot(diary %>% group_by(hetero_relationship, lag_nr_items_day) %>% 
-         summarise(count = n(),
-                   skip = mean(skipped_day, na.rm = T)), aes(lag_nr_items_day, count, fill = skip)) + 
-  geom_bar(stat = 'identity') +
-  scale_color_viridis_c() +
-  facet_wrap(~ hetero_relationship, labeller = as_labeller(c("0" = "single", "1" = "in relationship")))
-
-ggplot(diary, aes(lag_nr_items_day, skipped_day, color = factor(hetero_relationship))) + 
-  geom_pointrange(stat='summary', fun.data='mean_cl_boot', alpha = 0.5) +
-  geom_smooth(method = 'glm', method.args = list(family = binomial())) +
-  scale_color_colorblind(guide = F) +
+  scale_x_continuous("No. of randomised items answered") +
   facet_wrap(~ hetero_relationship, labeller = as_labeller(c("0" = "single", "1" = "in relationship")))
 
 library(Hmisc)
+```
+
+```{r fig.cap="Is there any relationship between the number of items today and whether the participant takes part again on the next day? Only randomised variable counts with at least 100 instances are shown."}
 ggplot(diary %>% 
          group_by(hetero_relationship, lag_nr_items_day) %>% 
          filter(n() > 100), aes(lag_nr_items_day, skipped_day, color = factor(hetero_relationship))) + 
   geom_pointrange(stat='summary', fun.data='mean_cl_boot', alpha = 0.5) +
   geom_smooth(method = 'glm', method.args = list(family = binomial())) +
   scale_color_colorblind(guide = F) +
+  scale_y_continuous("Skipped next day") +
+  scale_x_continuous("No. of randomised items answered") +
   facet_wrap(~ hetero_relationship, labeller = as_labeller(c("0" = "single", "1" = "in relationship")))
-
-summary(m1 <- lme4::glmer(skipped_day ~ lag_nr_items_day * hetero_relationship + (1 + lag_nr_items_day | session), diary %>% ungroup() %>% 
-                      mutate(lag_nr_items_day = lag_nr_items_day/10), family = binomial))
-
-library(effects)
-plot(allEffects(m1))
-coef(m1)$session %>% as_tibble(rownames = "session") %>% 
-  left_join(diary %>% select(session, hetero_relationship) %>% distinct(), by = 'session', suffix = c("_est", "")) %>% 
-  arrange(lag_nr_items_day) %>% 
-  mutate(woman = fct_inorder(session)) %>% 
-ggplot(aes(woman, lag_nr_items_day, color = factor(hetero_relationship))) +
-  geom_point() +
-  coord_flip()  +
-  scale_color_colorblind(guide = F) +
-  facet_wrap(~ hetero_relationship, labeller = as_labeller(c("0" = "single", "1" = "in relationship")))
-  
-
-summary(glm(skipped_day ~ lag_nr_items_day, diary %>% ungroup() %>% filter(between(lag_nr_items_day, 10,37)), family = binomial))
 ```
+
+```{r}
+diary_dropout <- diary %>% ungroup() %>% 
+                      mutate(lag_nr_items_day = lag_nr_items_day/10) %>% drop_na(lag_nr_items_day)
+m0 <- lme4::glmer(skipped_day ~ hetero_relationship + (1 | session), diary_dropout, family = binomial)
+m1 <- lme4::glmer(skipped_day ~ lag_nr_items_day * hetero_relationship + (1 + lag_nr_items_day | session), diary_dropout, family = binomial)
+tidy(anova(m0, m1)) %>% 
+  select(term, df, AIC, logLik, statistic, Chi.Df, p.value) %>% 
+  knitr::kable(caption = "Model comparison", format = "latex", booktabs = TRUE, longtable = TRUE) %>%
+  footnote("Can we predict whether participants will skip the next day any better through the randomised number of items they answered today?", threeparttable = TRUE) %>% 
+  kable_styling(latex_options = "hold_position")
+```
+
