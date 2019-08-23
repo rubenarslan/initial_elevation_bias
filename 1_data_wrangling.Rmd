@@ -283,9 +283,13 @@ s3_daily_nr_items <- s3_daily_id %>%
   group_by(session, unit_session_id, created_date) %>% 
   summarise(nr_items_day = sum(hidden == 0 & showif %contains% "runif", na.rm = TRUE))
 
-diary <- diary %>% 
-  ungroup(session) %>% 
-  inner_join(s3_daily_nr_items, by = c("session", "created_date")) 
+diary <- diary %>% ungroup()
+diary <- s3_daily_nr_items %>% 
+  ungroup() %>% 
+  select(session) %>% 
+  distinct() %>% 
+  left_join(diary) %>% 
+  left_join(s3_daily_nr_items, by = c("session", "created_date")) 
 
 
 diary <- diary %>% 
@@ -296,12 +300,23 @@ diary <- diary %>%
   arrange(created_date) %>% 
   mutate(
     lag_nr_items_day = lag(nr_items_day_done),
-    lag_finished_entry = lag(did_not_finish_entry))
+    lag_finished_entry = lag(did_not_finish_entry)) %>% 
+  ungroup()
 
 ggplot(diary, aes(nr_items_day_done)) + 
   geom_bar()
 
 crosstabs(~ is.na(illness_pain) + did_not_finish_entry, diary)
+```
+
+## Sanity checks
+```{r}
+library(testthat)
+expect_null(groups(diary))
+expect_equal(diary %>% drop_na(session, day_number) %>% 
+               group_by(session, day_number) %>% filter(n() > 1) %>% nrow(), 0)
+expect_equal(s3_daily_id_answered %>%
+               group_by(session, day_number, item_name) %>% filter(n() > 1) %>% nrow(), 0)
 ```
 
 

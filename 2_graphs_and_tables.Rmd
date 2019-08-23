@@ -10,7 +10,7 @@ output:
 ---
 
 
-```{r}
+```{r message=F,warning=F}
 options(stringsAsFactors = FALSE)
 #' show two significant digits tops
 options(digits = 2)
@@ -126,12 +126,19 @@ first_page %>%
 ## Information for the narrative description of the study.
 
 ```{r}
+diary <- s3_daily_id_answered %>% 
+  ungroup() %>% 
+  select(session, day_number) %>% 
+  distinct() %>% 
+  left_join(diary)
+
 skimr::skim_with(haven_labelled = skimr::get_skimmers()$numeric)
 all_surveys <- diary %>% ungroup() %>% 
   select(session, didntmissfirstweek, hetero_relationship,
                           age, education_years, has_children, nr_children, relationship_status,
                           occupational_status) %>% 
   distinct()
+diary %>% filter(did_not_finish_entry == 0) %>% nrow()
 
 first_page %>% group_by(session, unit_session_id) %>% 
   summarise(answered = any(!is.na(answer))) %>% 
@@ -154,17 +161,6 @@ sort(round(props(occupational_status %contains% "employed"),2))
 relationship_status <- all_surveys$relationship_status
 sort(round(props(haven::as_factor(relationship_status)),2))
 codebook::plot_labelled(relationship_status) + coord_flip()
-
-first_page %>% 
-  mutate(first_day_of_item = if_else(first_day_of_item > 6, "7+", as.character(first_day_of_item))) %>% 
-  group_by(item_name, first_day_of_item) %>% 
-  summarise(n = n_distinct(session)) %>% 
-  spread(first_day_of_item, n, fill = 0)# %>% 
-  ungroup() %>% 
-  select(-item_name) %>% 
-  rowSums()
-  
-diary %>% filter(did_not_finish_entry == 0) %>% nrow()
 ```
 
 
