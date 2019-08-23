@@ -40,3 +40,4 @@ rsconnect/
 *.rds
 *.log
 *.toc
+supplement_files/
