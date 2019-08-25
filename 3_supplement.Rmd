@@ -389,7 +389,7 @@ first_page %>%
 
 # Multilevel analysis 
 
-```{r fig.cap="Figure 5 only showed the randomised variables. Here, we additionally show the estimates for the covariates.",fig.width=15,fig.height=11}
+```{r fig.cap="Figure 6 only showed the randomised variables. Here, we additionally show the estimates for the covariates.",fig.width=15,fig.height=11}
 predictors <- first_page %>% 
   mutate(item_order = display_order,
          times_item_shown = times_item_answered,
@@ -466,7 +466,7 @@ predictors %>%
 ```{r}
 all_biases %>% show_dt() %>% 
    knitr::kable(caption = "Multilevel regression coefficients", format = "latex", booktabs = TRUE, longtable = TRUE) %>%
-  footnote("Estimates from the multilevel regression model displayed in Figure 5, with 95% confidence intervals.", threeparttable = TRUE) %>% 
+  footnote("Estimates from the multilevel regression model displayed in Figure 6, with 95% confidence intervals.", threeparttable = TRUE) %>% 
   kable_styling(latex_options = "hold_position") %>% 
   column_spec(1, width = "2.5cm") %>% 
   column_spec(2:7, width = "1.7cm")
@@ -632,7 +632,7 @@ predictors %>%
 ```{r}
 predictors %>% 
   split(.$label_english) %>%
-  map(~ as.data.frame(anova(
+  map(~ tidy(anova(
     lmer(answer ~ items_shown + item_order + times_item_shown + day_number + refer_time_period +  (1 | session), data = ., REML = FALSE),
     lmer(answer ~ last_item + items_shown + item_order + times_item_shown + day_number + refer_time_period +  (1 | session), data = .), REML = FALSE)
     )) %>% 
@@ -937,7 +937,7 @@ predictors %>%
 ```{r}
 all_biases %>% show_dt() %>% 
    knitr::kable(caption = "Multilevel regression coefficients", format = "latex", booktabs = TRUE, longtable = TRUE) %>%
-  footnote("Estimates from the multilevel regression model displayed in Figure 5, with 95% confidence intervals.", threeparttable = TRUE) %>% 
+  footnote("Estimates from the multilevel regression model, with 95% confidence intervals.", threeparttable = TRUE) %>% 
   kable_styling(latex_options = "hold_position") %>% 
   column_spec(1, width = "2.5cm") %>% 
   column_spec(2:7, width = "1.9cm")
@@ -1073,7 +1073,7 @@ all_biases %>%
   mutate(response = str_sub(response, 9)) %>% 
   show_dt() %>% 
    knitr::kable(caption = "Multilevel regression coefficients", format = "latex", booktabs = TRUE, longtable = TRUE) %>%
-  footnote("Estimates from the multilevel regression model displayed in Figure 5, with 95% confidence intervals.", threeparttable = TRUE) %>% 
+  footnote("Estimates from the multilevel regression model, with 95% confidence intervals.", threeparttable = TRUE) %>% 
   kable_styling(latex_options = "hold_position") %>% 
   column_spec(1, width = "2.4cm") %>% 
   column_spec(2:7, width = "1.8cm")
@@ -1201,7 +1201,7 @@ predictors %>%
 ```{r}
 all_biases %>% show_dt() %>% 
    knitr::kable(caption = "Multilevel regression coefficients", format = "latex", booktabs = TRUE, longtable = TRUE) %>%
-  footnote("Estimates from the multilevel regression model displayed in Figure 5, with 95% confidence intervals.", threeparttable = TRUE) %>% 
+  footnote("Estimates from the multilevel regression model, with 95% confidence intervals.", threeparttable = TRUE) %>% 
   kable_styling(latex_options = "hold_position") %>% 
   column_spec(1, width = "2.5cm") %>% 
   column_spec(2:7, width = "2.5cm")
