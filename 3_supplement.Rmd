@@ -122,7 +122,7 @@ diary <- cyphr::decrypt(readRDS("diary.rds"), key)
 
 
 first_page = s3_daily_id_answered  %>% 
-  filter(item_name %in% c("irritable", "self_esteem", "risk_taking", "good_mood", "loneliness", "stressed")) %>% 
+  filter(item_name %in% c("irritable", "self_esteem", "risk_taking", "good_mood", "loneliness", "relationship_satisfaction", "stressed")) %>% 
   group_by(session, unit_session_id) %>% 
   mutate(display_order = min_rank(display_order),
          number_of_items_shown = n()) %>%  
@@ -130,7 +130,8 @@ first_page = s3_daily_id_answered  %>%
   mutate(
         last_item = if_na(lag(label_english), "[None]")) %>% 
   ungroup() %>% 
-  mutate(last_item = relevel(factor(last_item), ref =  "[None]"))
+  mutate(last_item = relevel(factor(last_item), ref =  "[None]")) %>% 
+  filter(item_name %in% c("irritable", "self_esteem", "risk_taking", "good_mood", "loneliness", "stressed"))
 ```
 
 # Additional descriptive statistics
@@ -352,7 +353,7 @@ first_page %>% filter(response_time_since_previous < 1*30*1000, response_time_si
   geom_pointrange(alpha = 0.3, position = position_dodge(width = 0.2), stat ='summary', fun.data = 'mean_se') + 
   geom_line(position = position_dodge(width = 0.4), stat ='summary', fun.y = function(x) { mean(x, na.rm =T, trim = 0.1) }) +
   scale_y_continuous("Response time (in s) since previous item") +
-  scale_x_continuous("No. of items shown", breaks = 1:6) +
+  scale_x_continuous("No. of items shown", breaks = 1:7) +
   facet_wrap(~ label_english, scales = 'free_y')
 ```
 
@@ -553,8 +554,6 @@ predictors %>%
   column_spec(2, width = "1.5cm")
 ```
 
-\pagebreak
-
 ### Last item identity
 ```{r fig.cap="Here, we additionally test for an effect of last item identity (which is heavily collinear with item order).",fig.width=15,fig.height=14}
 predictors <- first_page %>% 
@@ -578,6 +577,7 @@ all_biases <- complex_mods %>%
 all_biases %>% 
   filter(is.na(group)) %>% 
   filter(term != "(Intercept)") %>% 
+  filter(response != "relationship_satisfaction") %>% 
   left_join(
     first_page %>% select(response = item_name, item = label_english, item_mean, item_sd) %>% distinct()
   ) %>% 
@@ -616,6 +616,7 @@ all_biases %>%
 
 ```{r}
 predictors %>% 
+  filter(item_name != "relationship_satisfaction") %>% 
   split(.$label_english) %>%
   map(~ cor(residuals(lmer(answer ~ weekday + day_number_factor + refer_time_period + (1 | session), .)), residuals(lmer(answer ~ last_item + weekday + items_shown + item_order + first_day_of_item_shown + day_number_factor + refer_time_period + (1 | session), data = .)))^2) %>% 
   bind_rows() %>% 
@@ -631,6 +632,7 @@ predictors %>%
 
 ```{r}
 predictors %>% 
+  filter(item_name != "relationship_satisfaction") %>% 
   split(.$label_english) %>%
   map(~ tidy(anova(
     lmer(answer ~ items_shown + item_order + times_item_shown + day_number + refer_time_period +  (1 | session), data = ., REML = FALSE),
@@ -806,6 +808,8 @@ predictors %>%
   column_spec(1, width = "5cm") %>% 
   column_spec(2, width = "1.5cm")
 ```
+
+\pagebreak
 
 
 \pagebreak
@@ -1238,6 +1242,8 @@ ggplot(diary %>%
   scale_x_continuous("No. of randomised items answered") +
   facet_wrap(~ hetero_relationship, labeller = as_labeller(c("0" = "single", "1" = "in relationship")))
 ```
+
+\pagebreak
 
 ```{r}
 diary_dropout <- diary %>% ungroup() %>% 

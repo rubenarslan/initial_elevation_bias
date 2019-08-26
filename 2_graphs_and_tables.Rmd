@@ -68,7 +68,7 @@ diary <- cyphr::decrypt(readRDS("diary.rds"), key)
 # s3_daily_id_answered <-  rio::import("../routine_and_sex/data/s3_daily_id_answered.feather")
 
 first_page = s3_daily_id_answered  %>% 
-  filter(item_name %in% c("irritable", "self_esteem", "risk_taking", "good_mood", "loneliness", "stressed")) %>% 
+  filter(item_name %in% c("irritable", "self_esteem", "risk_taking", "good_mood", "loneliness", "relationship_satisfaction", "stressed")) %>% 
   group_by(session, unit_session_id) %>% 
   mutate(display_order = min_rank(display_order),
          number_of_items_shown = n()) %>%  
@@ -76,7 +76,8 @@ first_page = s3_daily_id_answered  %>%
   mutate(
         last_item = if_na(lag(label_english), "[None]")) %>% 
   ungroup() %>% 
-  mutate(last_item = relevel(factor(last_item), ref =  "[None]"))
+  mutate(last_item = relevel(factor(last_item), ref =  "[None]")) %>% 
+  filter(item_name %in% c("irritable", "self_esteem", "risk_taking", "good_mood", "loneliness", "stressed"))
 ```
 
 
@@ -171,7 +172,7 @@ codebook::plot_labelled(relationship_status) + coord_flip()
 We showed above that responses do not drift much over time in the diary. But do
 participants learn to respond more quickly?
 
-```{r fig.width=15,fig.height=6}
+```{r fig.width=15,fig.height=7}
 first_page %>% filter(response_time_since_previous < 1*30*1000, response_time_since_previous > 0, display_order > 1) %>% 
   ggplot(., aes(day_number, response_time_since_previous/1000)) + 
   geom_pointrange(alpha = 0.3, position = position_dodge(width = 0.2), stat ='summary', fun.data = 'mean_se') + 
@@ -194,7 +195,7 @@ this would be evidence for initial elevation bias.
 
 In this graph, we show the first week. The Y axes include the global mean ± 1 global standard deviation for each item.
 
-```{r fig.width=15,fig.height=6}
+```{r fig.width=15,fig.height=7}
 first_page %>% 
   filter(day_number < 7) %>% 
   group_by(item_name) %>% 
@@ -224,7 +225,7 @@ than later responses. Different mechanisms of response bias (e.g., amount of mou
 Item order is confounded with another randomised variable, namely the number
 of items shown on each page. For example, an item order of six only occurs when all six items were shown.
 
-```{r fig.width-15, fig.height=6}
+```{r fig.width-15, fig.height=7}
 first_page %>%
   ggplot(., aes(display_order, answer)) + 
   geom_blank(aes(y = item_mean, ymin = item_mean - item_sd, ymax = item_mean + item_sd)) +
@@ -232,7 +233,7 @@ first_page %>%
   geom_pointrange(position = position_dodge(width = 0.2), stat = 'summary', fun.data = 'mean_se') + 
   geom_line(position = position_dodge(width = 0.4), stat = 'summary', fun.data = 'mean_se') + 
   scale_y_continuous("Response") +
-  scale_x_continuous("Item order", breaks = 1:6) +
+  scale_x_continuous("Item order", breaks = 1:7) +
   facet_wrap(~ label_english, scales = 'free_y')
 
 ggsave(width = opts_current$get("fig.width"), height = opts_current$get("fig.height"), filename = "Figure3.png")
@@ -268,7 +269,7 @@ are likely to have a later item order. Most importantly, when only one item is s
 is also one. As above, we can not only examine the mean but also the relative frequencies of 
 each response.
 
-```{r fig.width=15, fig.height=6}
+```{r fig.width=15, fig.height=7}
 first_page %>% 
   group_by(label_english, item_name, number_of_items_shown) %>% 
   mutate(group_n = n_nonmissing(answer)) %>% 
@@ -286,7 +287,7 @@ ggsave(width = opts_current$get("fig.width"), height = opts_current$get("fig.hei
 
 ## Figure 6: Multilevel model responses
 
-```{r fig.width=15,fig.height=6}
+```{r fig.width=15,fig.height=7}
 predictors <- first_page %>% 
   mutate(item_order = display_order,
          times_item_shown = times_item_answered,
@@ -356,7 +357,7 @@ Testing the times the item was seen already (reference category: first day) as a
 
 adjusting for day number (0 to 7+), the time period referred to (affected by how often people have responded so far), which day the item was first shown, the day number, and a random effect for the woman.
 
-```{r fig.width=15,fig.height=6}
+```{r fig.width=15,fig.height=7}
 predictors_rt <- predictors %>% 
   filter(response_time_since_previous < 30*1000, response_time_since_previous > 0,
          item_order != "1")

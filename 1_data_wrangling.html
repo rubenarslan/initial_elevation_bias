@@ -443,8 +443,9 @@ summary {
 <li><a href="#load-pre-cleaned-wide-diary-data"><span class="toc-section-number">0.2</span> Load pre-cleaned wide diary data</a></li>
 <li><a href="#load-item-metadata"><span class="toc-section-number">0.3</span> Load item metadata</a></li>
 <li><a href="#load-and-process-long-form-diary-data"><span class="toc-section-number">0.4</span> Load and process long-form diary data</a></li>
-<li><a href="#save-data"><span class="toc-section-number">0.5</span> Save data</a></li>
-<li><a href="#how-key-was-set"><span class="toc-section-number">0.6</span> How key was set</a></li>
+<li><a href="#sanity-checks"><span class="toc-section-number">0.5</span> Sanity checks</a></li>
+<li><a href="#save-data"><span class="toc-section-number">0.6</span> Save data</a></li>
+<li><a href="#how-key-was-set"><span class="toc-section-number">0.7</span> How key was set</a></li>
 </ul>
 </div>
 
@@ -760,7 +761,8 @@ diary &lt;- diary %&gt;%
   arrange(created_date) %&gt;% 
   mutate(
     lag_nr_items_day = lag(nr_items_day_done),
-    lag_finished_entry = lag(did_not_finish_entry))
+    lag_finished_entry = lag(did_not_finish_entry)) %&gt;% 
+  ungroup()
 
 ggplot(diary, aes(nr_items_day_done)) + 
   geom_bar()</code></pre>
@@ -771,8 +773,17 @@ ggplot(diary, aes(nr_items_day_done)) +
 ##               FALSE 60613   616
 ##               TRUE      0 15728</code></pre>
 </div>
+<div id="sanity-checks" class="section level2">
+<h2><span class="header-section-number">0.5</span> Sanity checks</h2>
+<pre class="r"><code>library(testthat)
+expect_null(groups(diary))
+expect_equal(diary %&gt;% drop_na(session, day_number) %&gt;% 
+               group_by(session, day_number) %&gt;% filter(n() &gt; 1) %&gt;% nrow(), 0)
+expect_equal(s3_daily_id_answered %&gt;%
+               group_by(session, day_number, item_name) %&gt;% filter(n() &gt; 1) %&gt;% nrow(), 0)</code></pre>
+</div>
 <div id="save-data" class="section level2">
-<h2><span class="header-section-number">0.5</span> Save data</h2>
+<h2><span class="header-section-number">0.6</span> Save data</h2>
 <p>Remove unused variables to reduce risk of re-identification</p>
 <pre class="r"><code>s3_daily_id_answered &lt;- s3_daily_id_answered %&gt;% 
   select(session, didntmissfirstweek, # person level
@@ -782,7 +793,7 @@ ggplot(diary, aes(nr_items_day_done)) +
          first_day_of_item, first_day_of_item_factor, first_day_of_item_shown, showif, 
          times_item_answered, times_item_answered_factor, 
          number_of_items_shown, last_answer, response_time_since_previous) %&gt;% 
-    filter(item_name %in% c(&quot;irritable&quot;, &quot;self_esteem&quot;, &quot;risk_taking&quot;, &quot;good_mood&quot;, &quot;loneliness&quot;, &quot;stressed&quot;,
+    filter(item_name %in% c(&quot;irritable&quot;, &quot;self_esteem&quot;, &quot;risk_taking&quot;, &quot;good_mood&quot;, &quot;loneliness&quot;, &quot;stressed&quot;, &quot;relationship_satisfaction&quot;,
                            &quot;in_pair_desire_7&quot;, &quot;in_pair_desire_8&quot;, &quot;in_pair_desire_10&quot;, &quot;in_pair_desire_11&quot;, &quot;in_pair_desire_13&quot;, &quot;in_pair_desire_14&quot;) |
          item_name %contains% &quot;mate_retention&quot; | item_name %starts_with% &quot;time_&quot;)
 
@@ -805,7 +816,7 @@ encrypt(saveRDS(diary, &quot;diary.rds&quot;), key)
 encrypt(write.csv(diary, &quot;diary.csv&quot;), key)</code></pre>
 </div>
 <div id="how-key-was-set" class="section level2">
-<h2><span class="header-section-number">0.6</span> How key was set</h2>
+<h2><span class="header-section-number">0.7</span> How key was set</h2>
 <pre class="r"><code>keyring::key_set(&quot;encrypt_data_routinely_randomise&quot;)
 # entered key (precisely 16/24/32 characters long)</code></pre>
 </div>

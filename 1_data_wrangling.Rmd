@@ -332,7 +332,7 @@ s3_daily_id_answered <- s3_daily_id_answered %>%
          first_day_of_item, first_day_of_item_factor, first_day_of_item_shown, showif, 
          times_item_answered, times_item_answered_factor, 
          number_of_items_shown, last_answer, response_time_since_previous) %>% 
-    filter(item_name %in% c("irritable", "self_esteem", "risk_taking", "good_mood", "loneliness", "stressed",
+    filter(item_name %in% c("irritable", "self_esteem", "risk_taking", "good_mood", "loneliness", "stressed", "relationship_satisfaction",
                            "in_pair_desire_7", "in_pair_desire_8", "in_pair_desire_10", "in_pair_desire_11", "in_pair_desire_13", "in_pair_desire_14") |
          item_name %contains% "mate_retention" | item_name %starts_with% "time_")
 
