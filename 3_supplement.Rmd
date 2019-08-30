@@ -463,6 +463,7 @@ predictors %>%
   column_spec(2, width = "1.5cm")
 ```
 
+\pagebreak
 
 ```{r}
 all_biases %>% show_dt() %>% 
@@ -480,7 +481,7 @@ Here, we examine several alternative model specifications to see whether the res
 
 ### Complete first week
 
-```{r fig.cap="Here, we fit the same model as before, but include only participants who participated the entire first week.",fig.width=15,fig.height=10}
+```{r fig.cap="Here, we fit the same model as before, but include only participants who participated the entire first week.",fig.width=15,fig.height=14}
 predictors <- first_page %>% 
   filter(didntmissfirstweek) %>% 
   mutate(item_order = display_order,
@@ -539,6 +540,8 @@ all_biases %>%
   coord_flip()
 ```
 
+\pagebreak
+
 ```{r}
 predictors %>% 
   split(.$label_english) %>%
@@ -555,7 +558,7 @@ predictors %>%
 ```
 
 ### Last item identity
-```{r fig.cap="Here, we additionally test for an effect of last item identity (which is heavily collinear with item order).",fig.width=15,fig.height=14}
+```{r fig.cap="Here, we additionally test for an effect of last item identity (which is heavily collinear with item order).",fig.width=15,fig.height=18}
 predictors <- first_page %>% 
   mutate(item_order = display_order,
          times_item_shown = times_item_answered,
@@ -614,6 +617,8 @@ all_biases %>%
   coord_flip()
 ```
 
+\pagebreak
+
 ```{r}
 predictors %>% 
   filter(item_name != "relationship_satisfaction") %>% 
@@ -624,11 +629,13 @@ predictors %>%
   mutate(Correlation = sprintf("%.2f", Correlation)) %>% 
   arrange(Correlation) %>% 
   knitr::kable(caption = "Residual correlation", format = "latex",  booktabs = TRUE) %>% 
-  footnote("Correlation between the residuals of a covariate-only model and a model additionally including the randomised variables.", threeparttable = TRUE) %>% 
+  footnote("Correlation between the residuals of a covariate-only model and a model additionally including the randomised variables (including last item identity).", threeparttable = TRUE) %>% 
   kable_styling(latex_options = "hold_position") %>% 
   column_spec(1, width = "5cm") %>% 
   column_spec(2, width = "1.5cm")
 ```
+
+\pagebreak
 
 ```{r}
 predictors %>% 
@@ -648,7 +655,7 @@ predictors %>%
 
 ### Varying effects
 
-```{r fig.cap="Here, we allow the effect of the randomised variables to vary by woman.",fig.width=15,fig.height=10}
+```{r fig.cap="Here, we allow the effect of the randomised variables to vary by woman.",fig.width=15,fig.height=14}
 predictors <- first_page %>% 
   mutate(item_order = display_order,
          times_item_shown = times_item_answered,
@@ -736,7 +743,7 @@ all_biases %>% show_dt() %>%
 
 ### Nonlinear effects
 
-```{r fig.cap="Here, we allow the effects of the randomised variables to be nonlinear.",fig.width=15,fig.height=15}
+```{r fig.cap="Here, we allow the effects of the randomised variables to be nonlinear.",fig.width=15,fig.height=18}
 predictors <- first_page %>% 
   mutate(item_order = factor(display_order),
          times_item_shown = times_item_answered_factor,
@@ -794,6 +801,8 @@ all_biases %>%
   coord_flip()
 ```
 
+\pagebreak
+
 ```{r}
 predictors %>% 
   split(.$label_english) %>%
@@ -811,8 +820,6 @@ predictors %>%
 
 \pagebreak
 
-
-\pagebreak
 
 # Other items
 
@@ -842,7 +849,7 @@ On  a "less than usual" to "more than usual" response scale.
 time_items %>% group_by(item_name, label_english) %>% 
   summarise(women = n_distinct(session),
             days = n_distinct(unit_session_id)) %>% 
-  knitr::kable(format = "latex", caption = "How often did how many women see each item?") %>% 
+  knitr::kable(format = "latex", caption = "How often did how many women see each item?",  booktabs = TRUE) %>% 
   kable_styling(latex_options = "hold_position")
 ```
 
@@ -864,8 +871,9 @@ time_items %>%
   scale_x_continuous("Day number", breaks = 0:10)
 ```
 
+\pagebreak
 
-```{r fig.cap="Estimates for biases and covariates for the time items.",fig.width=15,fig.height=10}
+```{r fig.cap="Estimates for biases and covariates for the time items.",fig.width=15,fig.height=14}
 predictors <- time_items %>% 
   mutate(item_order = display_order,
          times_item_shown = times_item_answered,
@@ -973,7 +981,7 @@ On a "very inaccurate" to "very accurate" response scale.
 desire_items %>% group_by(label_english) %>% 
   summarise(women = n_distinct(session),
             days = n_distinct(unit_session_id)) %>% 
-  knitr::kable(format = "latex", caption = "How often did how many women see each item?") %>% 
+  knitr::kable(format = "latex", caption = "How often did how many women see each item?",  booktabs = TRUE) %>% 
   kable_styling(latex_options = "hold_position")
 ```
 
@@ -998,7 +1006,7 @@ desire_items %>%
 ```
 
 
-```{r fig.cap="Estimates for biases and covariates for the desire items.",fig.width=15,fig.height=13}
+```{r fig.cap="Estimates for biases and covariates for the desire items.",fig.width=15,fig.height=15}
 predictors <- desire_items %>% 
   mutate(item_order = display_order,
          times_item_shown = times_item_answered,
@@ -1055,6 +1063,8 @@ all_biases %>%
   coord_flip()
 ```
 
+\pagebreak
+
 ```{r}
 predictors %>% 
   split(.$label_english) %>%
@@ -1106,7 +1116,7 @@ retention_items %>%
   group_by(item_name, label_english) %>% 
   summarise(women = n_distinct(session),
             days = n_distinct(unit_session_id)) %>% 
-  knitr::kable(format = "latex", caption = "How often did how many women see each item?") %>% 
+  knitr::kable(format = "latex", caption = "How often did how many women see each item?",  booktabs = TRUE) %>% 
   kable_styling(latex_options = "hold_position")
 ```
 
