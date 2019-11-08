@@ -454,7 +454,7 @@ predictors %>%
   map(~ cor(residuals(lmer(answer ~ weekday + day_number_factor + refer_time_period + (1 | session), .)), residuals(lmer(answer ~ weekday + items_shown + item_order + first_day_of_item_shown + day_number_factor + refer_time_period + (1 | session), data = .)))^2) %>% 
   bind_rows() %>% 
   gather(`Response variable`, Correlation) %>% 
-  mutate(Correlation = sprintf("%.2f", Correlation)) %>% 
+  mutate(Correlation = sprintf("%.3f", Correlation)) %>% 
   arrange(Correlation) %>% 
   knitr::kable(caption = "Residual correlation", format = "latex",  booktabs = TRUE) %>% 
   footnote("Correlation between the residuals of a covariate-only model and a model additionally including the randomised variables.", threeparttable = TRUE) %>% 
@@ -548,7 +548,7 @@ predictors %>%
   map(~ cor(residuals(lmer(answer ~ weekday + day_number_factor + refer_time_period + (1 | session), .)), residuals(lmer(answer ~ weekday + items_shown + item_order + first_day_of_item_shown + day_number_factor + refer_time_period + (1 | session), data = .)))^2) %>% 
   bind_rows() %>% 
   gather(`Response variable`, Correlation) %>% 
-  mutate(Correlation = sprintf("%.2f", Correlation)) %>% 
+  mutate(Correlation = sprintf("%.3f", Correlation)) %>% 
   arrange(Correlation) %>% 
   knitr::kable(caption = "Residual correlation", format = "latex",  booktabs = TRUE) %>% 
   footnote("Correlation between the residuals of a covariate-only model and a model additionally including the randomised variables.", threeparttable = TRUE) %>% 
@@ -598,7 +598,7 @@ all_biases %>%
                            "No. times item shown", 
                            "Item order",
                            "Ref: since last entry",
-                           "Sunday","Saturday",  "Friday", "Thursday","Wednesday",  "Tuesday", 
+                           "Sunday", "Saturday",  "Friday", "Thursday","Wednesday",  "Tuesday", 
                            "Day^3",
                            "Day^2",
                            "Day")
@@ -626,7 +626,7 @@ predictors %>%
   map(~ cor(residuals(lmer(answer ~ weekday + day_number_factor + refer_time_period + (1 | session), .)), residuals(lmer(answer ~ last_item + weekday + items_shown + item_order + first_day_of_item_shown + day_number_factor + refer_time_period + (1 | session), data = .)))^2) %>% 
   bind_rows() %>% 
   gather(`Response variable`, Correlation) %>% 
-  mutate(Correlation = sprintf("%.2f", Correlation)) %>% 
+  mutate(Correlation = sprintf("%.3f", Correlation)) %>% 
   arrange(Correlation) %>% 
   knitr::kable(caption = "Residual correlation", format = "latex",  booktabs = TRUE) %>% 
   footnote("Correlation between the residuals of a covariate-only model and a model additionally including the randomised variables (including last item identity).", threeparttable = TRUE) %>% 
@@ -719,7 +719,7 @@ predictors %>%
   map(~ cor(residuals(lmer(answer ~ weekday + day_number_factor + refer_time_period + (1 | session), .)), residuals(lmer(answer ~ weekday + items_shown + item_order + first_day_of_item_shown + day_number_factor + refer_time_period + (1 + items_shown + item_order + first_day_of_item_shown | session), data = .)))^2) %>% 
   bind_rows() %>% 
   gather(`Response variable`, Correlation) %>% 
-  mutate(Correlation = sprintf("%.2f", Correlation)) %>% 
+  mutate(Correlation = sprintf("%.3f", Correlation)) %>% 
   arrange(Correlation) %>% 
   knitr::kable(caption = "Residual correlation", format = "latex",  booktabs = TRUE) %>% 
   footnote("Correlation between the residuals of a covariate-only model and a model additionally including the randomised variables.", threeparttable = TRUE) %>% 
@@ -809,7 +809,7 @@ predictors %>%
   map(~ cor(residuals(lmer(answer ~ weekday + day_number_factor + refer_time_period + (1 | session), .)), residuals(lmer(answer ~ weekday + items_shown + item_order + first_day_of_item_shown + day_number_factor + refer_time_period + (1 | session), data = .)))^2) %>% 
   bind_rows() %>% 
   gather(`Response variable`, Correlation) %>% 
-  mutate(Correlation = sprintf("%.2f", Correlation)) %>% 
+  mutate(Correlation = sprintf("%.3f", Correlation)) %>% 
   arrange(Correlation) %>% 
   knitr::kable(caption = "Residual correlation", format = "latex",  booktabs = TRUE) %>% 
   footnote("Correlation between the residuals of a covariate-only model and a model additionally including the randomised variables.", threeparttable = TRUE) %>% 
@@ -935,7 +935,7 @@ predictors %>%
   map(~ cor(residuals(lmer(answer ~ weekday + day_number_factor + refer_time_period + (1 | session), .)), residuals(lmer(answer ~ weekday + items_shown + item_order + first_day_of_item_shown + day_number_factor + refer_time_period + (1 | session), data = .)))^2) %>% 
   bind_rows() %>% 
   gather(`Response variable`, Correlation) %>% 
-  mutate(Correlation = sprintf("%.2f", Correlation)) %>% 
+  mutate(Correlation = sprintf("%.3f", Correlation)) %>% 
   arrange(Correlation) %>% 
   knitr::kable(caption = "Residual correlation", format = "latex",  booktabs = TRUE) %>% 
   footnote("Correlation between the residuals of a covariate-only model and a model additionally including the randomised variables.", threeparttable = TRUE) %>% 
@@ -1071,7 +1071,7 @@ predictors %>%
   map(~ cor(residuals(lmer(answer ~ weekday + day_number_factor + refer_time_period + (1 | session), .)), residuals(lmer(answer ~ weekday + items_shown + item_order + first_day_of_item_shown + day_number_factor + refer_time_period + (1 | session), data = .)))^2) %>% 
   bind_rows() %>% 
   gather(`Response variable`, Correlation) %>% 
-  mutate(Correlation = sprintf("%.2f", Correlation)) %>% 
+  mutate(Correlation = sprintf("%.3f", Correlation)) %>% 
   arrange(Correlation) %>% 
   knitr::kable(caption = "Residual correlation", format = "latex",  booktabs = TRUE) %>% 
   footnote("Correlation between the residuals of a covariate-only model and a model additionally including the randomised variables.", threeparttable = TRUE) %>% 
@@ -1201,7 +1201,7 @@ predictors %>%
   map(~ cor(residuals(lmer(answer ~ weekday + day_number_factor + refer_time_period + (1 | session), .)), residuals(lmer(answer ~ weekday + items_shown + item_order + first_day_of_item_shown + day_number_factor + refer_time_period + (1 | session), data = .)))^2) %>% 
   bind_rows() %>% 
   gather(`Response variable`, Correlation) %>% 
-  mutate(Correlation = sprintf("%.2f", Correlation)) %>% 
+  mutate(Correlation = sprintf("%.3f", Correlation)) %>% 
   arrange(Correlation) %>% 
   knitr::kable(caption = "Residual correlation", format = "latex",  booktabs = TRUE) %>% 
   footnote("Correlation between the residuals of a covariate-only model and a model additionally including the randomised variables.", threeparttable = TRUE) %>% 

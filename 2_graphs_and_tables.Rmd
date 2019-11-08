@@ -44,7 +44,7 @@ library(ggplot2)
 library(feather)
 library(ggthemes)
 library(codebook)
-# library(kableExtra)
+library(kableExtra)
 library(Cairo)
 library(paletteer)
 
@@ -93,7 +93,7 @@ The following items were shown in random order on the first page of our diary.
 - I was satisfied with myself. (80%)
 - I was irritable. (40%)
 
-Participants (n=`r n_distinct(first_page$session)` women) could answer on a 5 point likert scale from "less than usual" [0] to "more than usual" [4]. Pole labels were placed left and right of blank, equally sized buttons. Participants answered the diary on `r nrow(diary)` days in total, or on `r round(nrow(diary)/n_distinct(first_page$session))` days per woman.
+Participants (n=`r n_distinct(first_page$session)` women) could answer on a 5 point likert scale from "less than usual" [0] to "more than usual" [4]. Pole labels were placed left and right of blank, equally sized buttons. Participants answered the diary on `r diary %>% filter(did_not_finish_entry == 0) %>% nrow()` days in total, or on `r round((diary %>% filter(did_not_finish_entry == 0) %>% nrow())/n_distinct(first_page$session))` days per woman.
 Because of our planned missing design with randomised display and order, participants saw only a subset of these items each day. Therefore, the following were randomised variables
 - the day an item was first shown (conditional on adjusting for day number), 
 - the number of times an item was seen previously (conditional as above). 
@@ -109,7 +109,7 @@ first_page %>% mutate(days_tot = n_distinct(unit_session_id)) %>% group_by(label
             mean = sprintf("%.2f", mean(answer, na.rm = T)),
             sd = sprintf("%.2f", sd(answer, na.rm = T)),
   pct_shown = round(days/first(days_tot),1)) %>% 
-  knitr::kable()
+  kable()
 ```
 
 ## Table 2
@@ -121,7 +121,9 @@ first_page %>%
   group_by(label_english, first_day_of_item) %>% 
   summarise(n = paste0(n_distinct(session), " (", round(n_distinct(session)/first(n_subjects) * 100), "%)")) %>% 
   spread(first_day_of_item, n, fill = 0) %>% 
-  kable(caption = "Number of women who first saw each item on the first, second, ..., n-th day.")
+  rename(Item = label_english) %>% 
+  kable(caption = "Number of women who first saw each item on the first, second, ..., n-th day.") %>% 
+  add_header_above(c(" " = 1, "First day of item presentation" = 8))
 ```
 
 ## Information for the narrative description of the study.
@@ -146,16 +148,16 @@ first_page %>% group_by(session, unit_session_id) %>%
   summarise(days = sum(answered)) %>% 
   select(days) %>% 
   skimr::skim_to_wide() %>% 
-  knitr::kable()
+  kable()
 
 all_surveys %>% 
   haven::zap_labels() %>% 
   select(age, hetero_relationship, education_years, has_children, nr_children) %>% skimr::skim_to_wide() %>% 
-  knitr::kable()
+  kable()
 
 occupational_status <- all_surveys$occupational_status
 sort(round(props(occupational_status),2)) %>% 
-  knitr::kable()
+  kable()
 sort(round(props(occupational_status %contains% "student"),2))
 sort(round(props(occupational_status %contains% "employed"),2))
 
