@@ -184,6 +184,7 @@ first_page %>% filter(response_time_since_previous < 1*30*1000, response_time_si
   facet_wrap(~ label_english)
 
 ggsave(width = opts_current$get("fig.width"), height = opts_current$get("fig.height"), filename = "Figure1.png")
+ggsave(width = opts_current$get("fig.width"), height = opts_current$get("fig.height"), filename = "Figure1.tiff", dpi = 600)
 ```
 
 ## Figure 2:  Initial elevation
@@ -215,6 +216,7 @@ first_page %>%
   scale_x_continuous("Day number", breaks = 0:10)
 
 ggsave(width = opts_current$get("fig.width"), height = opts_current$get("fig.height"), filename = "Figure2.png")
+ggsave(width = opts_current$get("fig.width"), height = opts_current$get("fig.height"), filename = "Figure2.tiff", dpi = 600)
 ```
 
 
@@ -239,6 +241,7 @@ first_page %>%
   facet_wrap(~ label_english, scales = 'free_y')
 
 ggsave(width = opts_current$get("fig.width"), height = opts_current$get("fig.height"), filename = "Figure3.png")
+ggsave(width = opts_current$get("fig.width"), height = opts_current$get("fig.height"), filename = "Figure3.tiff", dpi = 600)
 ```
 
 
@@ -262,6 +265,7 @@ first_page %>%
   facet_wrap(~ label_english, scales = 'free_x')
 
 ggsave(width = opts_current$get("fig.width"), height = opts_current$get("fig.height"), filename = "Figure4.png")
+ggsave(width = opts_current$get("fig.width"), height = opts_current$get("fig.height"), filename = "Figure4.tiff", dpi = 600)
 ```
 
 ## Figure 5: Number of items shown
@@ -285,6 +289,7 @@ first_page %>%
   facet_wrap(~ label_english, scales = "free_y")
 
 ggsave(width = opts_current$get("fig.width"), height = opts_current$get("fig.height"), filename = "Figure5.png")
+ggsave(width = opts_current$get("fig.width"), height = opts_current$get("fig.height"), filename = "Figure5.tiff", dpi = 600)
 ```
 
 ## Figure 6: Multilevel model responses
@@ -351,6 +356,7 @@ all_biases %>%
   coord_flip()
 
 ggsave(width = opts_current$get("fig.width"), height = opts_current$get("fig.height"), filename = "Figure6.png")
+ggsave(width = opts_current$get("fig.width"), height = opts_current$get("fig.height"), filename = "Figure6.tiff", dpi = 600)
 ```
 
 ## Figure 7: Response time Multilevel models
@@ -418,6 +424,7 @@ initial_elevation_bias_rt %>%
   coord_flip()
 
 ggsave(width = opts_current$get("fig.width"), height = opts_current$get("fig.height"), filename = "Figure7.png")
+ggsave(width = opts_current$get("fig.width"), height = opts_current$get("fig.height"), filename = "Figure7.tiff", dpi = 600)
 ```
 
 
