@@ -83,6 +83,19 @@ first_page = s3_daily_id_answered  %>%
   filter(item_name %in% c("irritable", "self_esteem", "risk_taking", "good_mood", "loneliness", "stressed"))
 ```
 
+# Checksums
+Because we cannot freeze the access-controlled data files on OSF, we instead
+freeze the MD5 checksums (which would change if the data files were changed).
+
+```{r echo=TRUE}
+as.character(openssl::md5(file("diary.csv")))
+as.character(openssl::md5(file("diary.rds")))
+as.character(openssl::md5(file("s3_daily_id_answered.csv")))
+as.character(openssl::md5(file("s3_daily_id_answered.rds")))
+as.character(openssl::md5(serialize(diary, NULL)))
+as.character(openssl::md5(serialize(s3_daily_id_answered, NULL)))
+```
+
 # Diary (one row per day and woman)
 ```{r}
 library(codebook)

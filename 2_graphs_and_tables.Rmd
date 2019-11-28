@@ -183,7 +183,7 @@ first_page %>% filter(response_time_since_previous < 1*30*1000, response_time_si
   scale_x_continuous("Diary day") +
   facet_wrap(~ label_english)
 
-ggsave(width = opts_current$get("fig.width"), height = opts_current$get("fig.height"), filename = "Figure1.png")
+ggsave(width = opts_current$get("fig.width"), height = opts_current$get("fig.height"), filename = "Figure1.png", dpi = 600)
 ggsave(width = opts_current$get("fig.width"), height = opts_current$get("fig.height"), filename = "Figure1.tiff", compression = "jpeg", dpi = 600)
 ```
 
@@ -215,7 +215,7 @@ first_page %>%
   facet_wrap(~ label_english, scales = "free_y", nrow = 2) + 
   scale_x_continuous("Day number", breaks = 0:10)
 
-ggsave(width = opts_current$get("fig.width"), height = opts_current$get("fig.height"), filename = "Figure2.png")
+ggsave(width = opts_current$get("fig.width"), height = opts_current$get("fig.height"), filename = "Figure2.png", dpi = 600)
 ggsave(width = opts_current$get("fig.width"), height = opts_current$get("fig.height"), filename = "Figure2.tiff", compression = "jpeg", dpi = 600)
 ```
 
@@ -240,7 +240,7 @@ first_page %>%
   scale_x_continuous("Item order", breaks = 1:7) +
   facet_wrap(~ label_english, scales = 'free_y')
 
-ggsave(width = opts_current$get("fig.width"), height = opts_current$get("fig.height"), filename = "Figure3.png")
+ggsave(width = opts_current$get("fig.width"), height = opts_current$get("fig.height"), filename = "Figure3.png", dpi = 600)
 ggsave(width = opts_current$get("fig.width"), height = opts_current$get("fig.height"), filename = "Figure3.tiff", compression = "jpeg", dpi = 600)
 ```
 
@@ -264,7 +264,7 @@ first_page %>%
   coord_flip() +
   facet_wrap(~ label_english, scales = 'free_x')
 
-ggsave(width = opts_current$get("fig.width"), height = opts_current$get("fig.height"), filename = "Figure4.png")
+ggsave(width = opts_current$get("fig.width"), height = opts_current$get("fig.height"), filename = "Figure4.png", dpi = 600)
 ggsave(width = opts_current$get("fig.width"), height = opts_current$get("fig.height"), filename = "Figure4.tiff", compression = "jpeg", dpi = 600)
 ```
 
@@ -288,7 +288,7 @@ first_page %>%
   scale_x_continuous("Response", breaks = 0:4, labels = c("[0] less\nthan\nusual", 1, 2, 3, "[4] more\nthan\nusual")) +
   facet_wrap(~ label_english, scales = "free_y")
 
-ggsave(width = opts_current$get("fig.width"), height = opts_current$get("fig.height"), filename = "Figure5.png")
+ggsave(width = opts_current$get("fig.width"), height = opts_current$get("fig.height"), filename = "Figure5.png", dpi = 600)
 ggsave(width = opts_current$get("fig.width"), height = opts_current$get("fig.height"), filename = "Figure5.tiff", compression = "jpeg", dpi = 600)
 ```
 
@@ -355,7 +355,7 @@ all_biases %>%
   scale_x_discrete("Predictor") +
   coord_flip()
 
-ggsave(width = opts_current$get("fig.width"), height = opts_current$get("fig.height"), filename = "Figure6.png")
+ggsave(width = opts_current$get("fig.width"), height = opts_current$get("fig.height"), filename = "Figure6.png", dpi = 600)
 ggsave(width = opts_current$get("fig.width"), height = opts_current$get("fig.height"), filename = "Figure6.tiff", compression = "jpeg", dpi = 600)
 ```
 
@@ -423,7 +423,7 @@ initial_elevation_bias_rt %>%
   scale_x_discrete("Predictor") +
   coord_flip()
 
-ggsave(width = opts_current$get("fig.width"), height = opts_current$get("fig.height"), filename = "Figure7.png")
+ggsave(width = opts_current$get("fig.width"), height = opts_current$get("fig.height"), filename = "Figure7.png", dpi = 600)
 ggsave(width = opts_current$get("fig.width"), height = opts_current$get("fig.height"), filename = "Figure7.tiff", compression = "jpeg", dpi = 600)
 ```
 

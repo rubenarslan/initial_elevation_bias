@@ -372,18 +372,9 @@ summary {
 <li><a href="1_data_wrangling.html">Data wrangling</a></li>
 <li><a href="2_graphs_and_tables.html">Graphs and tables for paper</a></li>
 <li><a href="3_supplement.pdf">Supplementary Material (PDF)</a></li>
-<li><a href="4_codebook.html">Codebook</a></li>
+<li><a href="4_codebook.html">Codebook and dataset checksums</a></li>
 </ol>
 <p>See also <a href="https://osf.io/7y6ag/">OSF</a>.</p>
-<p>Because we cannot freeze the access-controlled data files on OSF, we instead freeze the MD5 checksums (which would change if the data files were changed).</p>
-<pre class="r"><code>as.character(openssl::md5(file(&quot;diary.csv&quot;)))</code></pre>
-<pre><code>## [1] &quot;b58c2d8f860c4d3818af4c0f7b2d0d41&quot;</code></pre>
-<pre class="r"><code>as.character(openssl::md5(file(&quot;diary.rds&quot;)))</code></pre>
-<pre><code>## [1] &quot;af27333e3fda1ee2ad211bcf3e00aea0&quot;</code></pre>
-<pre class="r"><code>as.character(openssl::md5(file(&quot;s3_daily_id_answered.csv&quot;)))</code></pre>
-<pre><code>## [1] &quot;fa227d0b415f93c92d2d59446c28f0bc&quot;</code></pre>
-<pre class="r"><code>as.character(openssl::md5(file(&quot;s3_daily_id_answered.rds&quot;)))</code></pre>
-<pre><code>## [1] &quot;4ea1192d623ca5e16176ecbf5258d485&quot;</code></pre>
 
 
 
