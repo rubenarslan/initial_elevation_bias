@@ -14,3 +14,13 @@ Reproducible reports:
 3. [Supplementary Material (PDF)](3_supplement.pdf)
 
 See also [OSF](https://osf.io/7y6ag/).
+
+Because we cannot freeze the access-controlled data files on OSF, we instead
+freeze the MD5 checksums (which would change if the data files were changed).
+
+```{r}
+as.character(openssl::md5(file("diary.csv")))
+as.character(openssl::md5(file("diary.rds")))
+as.character(openssl::md5(file("s3_daily_id_answered.csv")))
+as.character(openssl::md5(file("s3_daily_id_answered.rds")))
+```
