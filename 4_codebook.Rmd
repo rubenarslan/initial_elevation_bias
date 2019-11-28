@@ -1,0 +1,119 @@
+---
+editor_options:
+  chunk_output_type: inline
+title: "Routinely Randomize: Codebook"
+output: 
+  html_document: 
+    number_sections: yes
+    toc: yes
+    toc_depth: 3
+---
+
+```{r}
+knitr::opts_chunk$set(warning = F, message = F, error = FALSE, echo = F)
+```
+
+
+```{r message=F,warning=F}
+options(stringsAsFactors = FALSE)
+#' show two significant digits tops
+options(digits = 2)
+#' tend not to show scientific notation, because we're just psychologists
+options(scipen = 7)
+#' make output a bit wider
+options(width = 110)
+#' set a seed to make analyses depending on random number generation reproducible
+set.seed(1710) # if you use your significant other's birthday make sure you stay together for the sake of reproducibility
+
+
+#' ## Load packages
+#' generate the site
+library(rmarkdown)
+#' set options for chunks
+library(knitr)
+#' my formr utility package to generate e.g. the bibliography
+library(formr)
+#' pretty-printed output
+library(pander)
+#' tidyverse date times
+library(lubridate)
+#' tidyverse strings
+library(stringr)
+#' extractor functions for models
+library(broom)
+#' grammar of graphics plots
+library(ggplot2)
+#' svg graphs
+# library(svglite);
+library(feather)
+library(ggthemes)
+library(codebook)
+library(kableExtra)
+library(Cairo)
+library(paletteer)
+
+#' tidyverse: has a lot of naming conflicts, so always load last
+library(tidyverse)
+library(broom.mixed)
+library(tidylog)
+options(width = 4000)
+theme_set(theme_classic() + theme_pander(base_size = 18))
+```
+
+
+```{r}
+key <- keyring::key_get_raw("encrypt_data_routinely_randomise")
+class(key) <- c("aes", "raw")
+key <- cyphr::key_openssl(key)
+s3_daily_id_answered <- cyphr::decrypt(readRDS("s3_daily_id_answered.rds"), key)
+diary <- cyphr::decrypt(readRDS("diary.rds"), key)
+
+# s3_daily_id_answered <-  rio::import("../routine_and_sex/data/s3_daily_id_answered.feather")
+
+first_page = s3_daily_id_answered  %>% 
+  filter(item_name %in% c("irritable", "self_esteem", "risk_taking", "good_mood", "loneliness", "relationship_satisfaction", "stressed")) %>% 
+  group_by(session, unit_session_id) %>% 
+  mutate(display_order = min_rank(display_order),
+         number_of_items_shown = n()) %>%  
+  arrange(session, unit_session_id, display_order) %>% 
+  mutate(
+        last_item = if_na(lag(label_english), "[None]")) %>% 
+  ungroup() %>% 
+  mutate(last_item = relevel(factor(last_item), ref =  "[None]")) %>% 
+  filter(item_name %in% c("irritable", "self_esteem", "risk_taking", "good_mood", "loneliness", "stressed"))
+```
+
+# Diary (one row per day and woman)
+```{r}
+library(codebook)
+
+md <- list()
+md$name <- "Online diary survey entries from 1345 women"
+md$description <- "A diary study was conducted to collect data from >1300 women over 70 days each. Women answered a variety of free text and survey responses. Question order and whether a question was shown was randomised. This codebook documents a subset of this dataset."
+md$identifier <- "doi:10.17605/OSF.IO/7Y6AG"
+md$datePublished <- "2019-11-28"
+md$creator <- list(
+      "@type" = "Person",
+      givenName = "Ruben", familyName = "Arslan",
+      email = "ruben.arslan@gmail.com", 
+      affiliation = list("@type" = "Organization",
+        name = "MPI Human Development, Berlin"))
+md$citation <- "Arslan, R. C., Reitz, A. K., Driebe, J. C., Gerlach, T. M., & Penke, L. (2019, November 28). Routinely Randomize Potential Sources of Measurement Reactivity to Estimate and Adjust for Biases in Subjective Reports. Retrieved from osf.io/7y6ag"
+md$url <- "https://osf.io/7y6ag/"
+md$temporalCoverage <- "06/2016-05/2017" 
+md$spatialCoverage <- "German-speaking internet sample" 
+
+metadata(diary) <- md
+diary$session <- as.character(diary$session) # easy hack to prevent displaying all (meaningless user codes)
+codebook::compact_codebook(diary)
+```
+
+# Items (one row per item and day and woman)
+```{r}
+md$description <- "A diary study was conducted to collect data from >1300 women over 70 days each. Women answered a variety of free text and survey responses. Question order and whether a question was shown was randomised. This codebook documents a subset of this dataset. This dataset is structured with one row per item, day, and woman, and additionally contains information on item order and response times."
+metadata(s3_daily_id_answered) <- md
+
+s3_daily_id_answered$session <- as.character(s3_daily_id_answered$session)
+codebook::compact_codebook(s3_daily_id_answered)
+```
+

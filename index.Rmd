@@ -12,6 +12,7 @@ Reproducible reports:
 1. [Data wrangling](1_data_wrangling.html)
 2. [Graphs and tables for paper](2_graphs_and_tables.html)
 3. [Supplementary Material (PDF)](3_supplement.pdf)
+4. [Codebook](4_codebook.html)
 
 See also [OSF](https://osf.io/7y6ag/).
 
